@@ -1,0 +1,146 @@
+// schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN     
+  MANAGER   
+}
+
+enum ShiftType {
+  MORNING
+  AFTERNOON
+  EVENING
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  DONE
+}
+
+
+model User {
+  id           String     @id @default(cuid())
+  email        String     @unique
+  name         String?
+  phone        String?
+  role         UserRole   @default(ADMIN)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  account      Account?
+  employees    Employee[]
+  branches     Branch[]
+  departments  Department[]
+  shiftSlots   ShiftSlot[]   
+  shiftSignups ShiftSignup[]
+
+  @@index([email])
+}
+
+model Account {
+  id                  String   @id @default(cuid()) 
+  userId              String   @unique
+  passwordHash        String?
+  provider            String?  
+  providerAccountId   String?
+  accessToken         String?
+  refreshToken        String?
+  expiresAt           DateTime?
+  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Employee {
+  id            String     @id @default(cuid())
+  userId        String
+  branchId      String?
+  departmentId  String?   
+  fullName      String
+  phone         String?
+  active        Boolean    @default(true)
+  currentLevel  Int        @default(1) 
+  hiredAt       DateTime? 
+  resignedAt    DateTime?
+
+  user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch        Branch?    @relation(fields: [branchId], references: [id])
+  department    Department?@relation(fields: [departmentId], references: [id])
+
+  shiftSignups  ShiftSignup[]
+
+  @@index([userId])
+  @@index([branchId])
+  @@index([departmentId])
+}
+
+model Branch {
+  id         String    @id @default(cuid())
+  userId     String
+  name       String
+  address    String?
+  active     Boolean   @default(true)
+  createdAt  DateTime  @default(now())
+
+  user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employees  Employee[]
+  shiftSlots   ShiftSlot[]
+  shiftSignups ShiftSignup[]
+  @@index([userId])
+}
+
+model Department {
+  id       String   @id @default(cuid())
+  userId   String
+  name     String
+
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employees Employee[]
+
+  @@unique([userId, name])
+  @@index([userId])
+}
+
+
+
+
+model ShiftSlot {
+  id        String    @id @default(cuid())
+  userId    String
+  branchId  String
+  date      DateTime  
+  shift     ShiftType
+  capacity  Int       
+  createdAt DateTime  @default(now())
+
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch    Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  signups   ShiftSignup[]
+
+  @@unique([userId, branchId, date, shift])
+}
+
+model ShiftSignup {
+  id          String     @id @default(cuid())
+  userId      String
+  branchId    String
+  employeeId  String
+  date        DateTime   
+  shift       ShiftType
+  createdAt   DateTime   @default(now())
+
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  branch      Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  employee    Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  slot        ShiftSlot? @relation(fields: [userId, branchId, date, shift], references: [userId, branchId, date, shift])
+
+  @@unique([employeeId, date])
+
+  @@index([userId, branchId, date, shift])
+}
