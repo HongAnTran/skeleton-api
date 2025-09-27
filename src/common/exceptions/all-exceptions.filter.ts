@@ -27,18 +27,32 @@ export class AllExceptionsFilter implements ExceptionFilter {
         ? exception.message
         : 'Internal server error';
 
+    // Log the error with context
+    const errorContext = {
+      method: request.method,
+      url: request.url,
+      status,
+      message,
+      timestamp: new Date().toISOString(),
+    };
+
+    if (status >= 500) {
+      this.logger.error(`Server Error:`, exception, errorContext);
+    } else {
+      this.logger.warn(`Client Error:`, errorContext);
+    }
+
     const errorResponse = {
       statusCode: status,
       timestamp: new Date().toISOString(),
       message,
+      path: request.url,
     };
 
-    this.logger.error(
-      `${request.method} ${request.url}`,
-      exception instanceof Error ? exception.stack : exception,
-      'AllExceptionsFilter',
-    );
-
-    response.status(status).json(errorResponse);
+    try {
+      response.status(status).json(errorResponse);
+    } catch (responseError) {
+      this.logger.error('Failed to send error response:', responseError);
+    }
   }
 }

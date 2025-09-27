@@ -1,107 +1,100 @@
-import {
-  Injectable,
-  NotFoundException,
-  ConflictException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
-import { User } from './entities/user.entity';
-import { PasswordUtil } from '../../common/utils/password.util';
-import {
-  PaginationDto,
-  PaginatedResult,
-} from '../../common/dtos/pagination.dto';
+import { PasswordUtil } from 'src/common/utils/password.util';
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) {}
 
-  async create(createUserDto: CreateUserDto): Promise<User> {
-    const existingUser = await this.prisma.user.findUnique({
-      where: { email: createUserDto.email },
-    });
-
-    if (existingUser) {
-      throw new ConflictException('User with this email already exists');
-    }
-
-    const hashedPassword = await PasswordUtil.hash(createUserDto.password);
-
-    const user = await this.prisma.user.create({
+  async create(createUserDto: CreateUserDto) {
+    const { password, provider, email, ...userData } = createUserDto;
+    return this.prisma.user.create({
       data: {
-        email: createUserDto.email,
-        name: createUserDto.name,
-        // Note: Add password field to Prisma schema if needed
+        name: userData.name,
+        phone: userData.phone,
+        role: userData.role,
+        account: {
+          create: {
+            passwordHash: await PasswordUtil.hash(password),
+            provider: provider || 'local',
+            email: email,
+          },
+        },
+      },
+      include: {
+        employees: true,
+        branches: true,
+        departments: true,
       },
     });
-
-    return user;
   }
 
-  async findAll(paginationDto: PaginationDto): Promise<PaginatedResult<User>> {
-    const { page, limit, skip } = paginationDto;
-
-    const [users, total] = await Promise.all([
-      this.prisma.user.findMany({
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      this.prisma.user.count(),
-    ]);
-
-    return {
-      data: users,
-      meta: {
-        page,
-        limit,
-        total,
-        totalPages: Math.ceil(total / limit),
+  async findAll(skip?: number, take?: number) {
+    return this.prisma.user.findMany({
+      skip,
+      take,
+      include: {
+        employees: true,
+        branches: true,
+        departments: true,
       },
-    };
+    });
   }
 
-  async findOne(id: string): Promise<User> {
+  async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
       where: { id },
+      include: {
+        employees: true,
+        branches: true,
+        departments: true,
+        account: {
+          select: {
+            id: true,
+            provider: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+        },
+      },
     });
 
     if (!user) {
-      throw new NotFoundException('User not found');
+      throw new NotFoundException(`User with ID ${id} not found`);
     }
 
     return user;
   }
 
-  async findByEmail(email: string): Promise<User | null> {
-    return this.prisma.user.findUnique({
-      where: { email },
-    });
-  }
-
-  async update(id: string, updateUserDto: UpdateUserDto): Promise<User> {
-    await this.findOne(id); // Check if user exists
-
-    const updateData: any = { ...updateUserDto };
-
-    if (updateUserDto.password) {
-      updateData.password = await PasswordUtil.hash(updateUserDto.password);
+  async update(id: string, updateUserDto: UpdateUserDto) {
+    try {
+      return await this.prisma.user.update({
+        where: { id },
+        data: updateUserDto,
+        include: {
+          employees: true,
+          branches: true,
+          departments: true,
+        },
+      });
+    } catch (error) {
+      throw new NotFoundException(`User with ID ${id} not found`);
     }
-
-    const user = await this.prisma.user.update({
-      where: { id },
-      data: updateData,
-    });
-
-    return user;
   }
 
-  async remove(id: string): Promise<void> {
-    await this.findOne(id); // Check if user exists
+  async remove(id: string) {
+    try {
+      return await this.prisma.user.delete({
+        where: { id },
+      });
+    } catch (error) {
+      throw new NotFoundException(`User with ID ${id} not found`);
+    }
+  }
 
-    await this.prisma.user.delete({
-      where: { id },
-    });
+  async count() {
+    return this.prisma.user.count();
   }
 }

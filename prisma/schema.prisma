@@ -13,48 +13,53 @@ enum UserRole {
   MANAGER   
 }
 
-enum ShiftType {
-  MORNING
-  AFTERNOON
-  EVENING
-}
 
 enum TaskStatus {
+  PENDING   
+  DONE   
+}
+
+
+enum ShiftSignupStatus {
   PENDING
-  IN_PROGRESS
-  DONE
+  CONFIRMED
+  REJECTED
+  CANCELLED
 }
 
 
 model User {
   id           String     @id @default(cuid())
-  email        String     @unique
-  name         String?
+  name         String   @unique
   phone        String?
   role         UserRole   @default(ADMIN)
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
-
   account      Account?
   employees    Employee[]
   branches     Branch[]
   departments  Department[]
   shiftSlots   ShiftSlot[]   
-  shiftSignups ShiftSignup[]
-
-  @@index([email])
 }
-
 model Account {
   id                  String   @id @default(cuid()) 
-  userId              String   @unique
+  userId              String?   @unique
+  email               String     @unique
   passwordHash        String?
   provider            String?  
   providerAccountId   String?
   accessToken         String?
   refreshToken        String?
-  expiresAt           DateTime?
-  user                User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user                User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  employee            Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  employeeId          String?   @unique
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@index([userId])
+  @@index([employeeId])
+
+
 }
 
 model Employee {
@@ -63,21 +68,19 @@ model Employee {
   branchId      String?
   departmentId  String?   
   fullName      String
+  account       Account? 
+  accountId     String?
   phone         String?
   active        Boolean    @default(true)
+  avatar        String?
   currentLevel  Int        @default(1) 
-  hiredAt       DateTime? 
-  resignedAt    DateTime?
-
   user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   branch        Branch?    @relation(fields: [branchId], references: [id])
-  department    Department?@relation(fields: [departmentId], references: [id])
-
+  department    Department?    @relation(fields: [departmentId], references: [id])
   shiftSignups  ShiftSignup[]
-
-  @@index([userId])
-  @@index([branchId])
-  @@index([departmentId])
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+  tasks Task[] 
 }
 
 model Branch {
@@ -87,60 +90,57 @@ model Branch {
   address    String?
   active     Boolean   @default(true)
   createdAt  DateTime  @default(now())
-
   user       User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   employees  Employee[]
   shiftSlots   ShiftSlot[]
-  shiftSignups ShiftSignup[]
-  @@index([userId])
+  updatedAt    DateTime   @updatedAt
 }
 
 model Department {
   id       String   @id @default(cuid())
   userId   String
   name     String
-
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  employees Employee[]
-
-  @@unique([userId, name])
-  @@index([userId])
+  updatedAt    DateTime   @updatedAt
+  createdAt    DateTime   @default(now())
+  employees  Employee[]
 }
-
-
 
 
 model ShiftSlot {
   id        String    @id @default(cuid())
   userId    String
   branchId  String
+  startDate DateTime  
+  endDate   DateTime  
+  capacity  Int    
   date      DateTime  
-  shift     ShiftType
-  capacity  Int       
   createdAt DateTime  @default(now())
-
+  updatedAt    DateTime   @updatedAt
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   branch    Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
   signups   ShiftSignup[]
-
-  @@unique([userId, branchId, date, shift])
 }
 
 model ShiftSignup {
   id          String     @id @default(cuid())
-  userId      String
-  branchId    String
   employeeId  String
-  date        DateTime   
-  shift       ShiftType
   createdAt   DateTime   @default(now())
-
-  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
-  branch      Branch     @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  slotId      String
+  status      ShiftSignupStatus @default(PENDING)
   employee    Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  slot        ShiftSlot? @relation(fields: [userId, branchId, date, shift], references: [userId, branchId, date, shift])
+  slot        ShiftSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
+  updatedAt   DateTime   @updatedAt
+}
 
-  @@unique([employeeId, date])
-
-  @@index([userId, branchId, date, shift])
+model Task {
+  id          String     @id @default(cuid())
+  employeeId  String
+  title       String
+  description String?
+  status      TaskStatus @default(PENDING)
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  level       Int       @default(1)  
+  employee  Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }

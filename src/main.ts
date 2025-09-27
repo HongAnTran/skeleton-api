@@ -7,7 +7,6 @@ import { AppModule } from './app.module';
 import { PrismaService } from './database/prisma.service';
 import { createSwaggerConfig } from './config/swagger.config';
 import { AllExceptionsFilter } from './common/exceptions/all-exceptions.filter';
-import { ResponseInterceptor } from './common/interceptors/response.interceptor';
 import { AppConfig } from './config/app.config';
 
 async function bootstrap() {
@@ -20,8 +19,6 @@ async function bootstrap() {
 
     app.useGlobalFilters(new AllExceptionsFilter());
 
-    app.useGlobalInterceptors(new ResponseInterceptor());
-
     if (appConfig.helmet.enabled) {
       app.use(
         helmet({
@@ -31,17 +28,13 @@ async function bootstrap() {
       logger.log('✅ Helmet security headers enabled');
     }
 
-    if (appConfig.cors.enabled) {
-      app.enableCors({
-        origin: appConfig.cors.origin,
-        credentials: true,
-        methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-        allowedHeaders: ['Content-Type', 'Authorization', 'X-API-KEY'],
-      });
-      logger.log(
-        `✅ CORS enabled for origins: ${appConfig.cors.origin.join(', ')}`,
-      );
-    }
+    app.enableCors({
+      origin: '*',
+      credentials: true,
+      methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization', 'X-API-KEY'],
+    });
+    logger.log('✅ CORS enabled for origins: *');
 
     app.useGlobalPipes(
       new ValidationPipe({
@@ -69,8 +62,7 @@ async function bootstrap() {
       );
     }
 
-    const prismaService = app.get(PrismaService);
-    await prismaService.enableShutdownHooks(app);
+    app.get(PrismaService);
 
     const port = appConfig.port;
     await app.listen(port);
@@ -83,7 +75,6 @@ async function bootstrap() {
     logger.log(`🏃 Readiness Check: http://localhost:${port}/health/ready`);
   } catch (error) {
     logger.error('❌ Failed to start application', error);
-    process.exit(1);
   }
 }
 

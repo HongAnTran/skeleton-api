@@ -30,16 +30,14 @@ export class HealthController {
   @ApiResponse({ status: 200, description: 'Readiness check passed' })
   async readiness() {
     try {
-      const dbCheck = await this.prisma.$queryRaw`SELECT 1`;
+      await this.prisma.$queryRaw`SELECT 1`;
 
       return {
         status: 'ready',
-        timestamp: new Date().toISOString(),
       };
     } catch (error) {
       return {
         status: 'not_ready',
-        timestamp: new Date().toISOString(),
         error: error.message,
       };
     }

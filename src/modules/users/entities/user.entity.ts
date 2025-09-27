@@ -1,34 +1,25 @@
 import { ApiProperty } from '@nestjs/swagger';
+import { UserRole } from '@prisma/client';
 
 export class User {
-  @ApiProperty({
-    description: 'User unique identifier',
-    example: 'cuid-example-123',
-  })
+  @ApiProperty()
   id: string;
 
-  @ApiProperty({
-    description: 'User email address',
-    example: 'user@example.com',
-  })
+  @ApiProperty()
   email: string;
 
-  @ApiProperty({
-    description: 'User full name',
-    example: 'John Doe',
-    required: false,
-  })
+  @ApiProperty({ required: false })
   name?: string;
 
-  @ApiProperty({
-    description: 'User creation timestamp',
-    example: '2023-01-01T00:00:00.000Z',
-  })
+  @ApiProperty({ required: false })
+  phone?: string;
+
+  @ApiProperty({ enum: UserRole })
+  role: UserRole;
+
+  @ApiProperty()
   createdAt: Date;
 
-  @ApiProperty({
-    description: 'User last update timestamp',
-    example: '2023-01-01T00:00:00.000Z',
-  })
+  @ApiProperty()
   updatedAt: Date;
 }
