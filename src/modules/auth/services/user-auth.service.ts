@@ -11,7 +11,6 @@ import { PrismaService } from '../../../database/prisma.service';
 import { LoginDto } from '../dto/login.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
-import { UserRole } from '@prisma/client';
 
 @Injectable()
 export class UserAuthService {
@@ -29,8 +28,13 @@ export class UserAuthService {
       include: { user: true },
     });
 
-    if (!account || !account.passwordHash || !account.user) {
-      throw new UnauthorizedException('Invalid credentials');
+    if (
+      !account ||
+      !account.passwordHash ||
+      !account.user ||
+      account.role !== 'USER'
+    ) {
+      throw new ForbiddenException('Sai tài khoản hoặc mật khẩu');
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -38,13 +42,13 @@ export class UserAuthService {
       account.passwordHash,
     );
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new ForbiddenException('Sai mật khẩu');
     }
 
     const tokens = await this.generateTokens({
       accountId: account.id,
+      role: account.role,
       email: account.email,
-      role: account.user.role,
       userId: account.user.id,
     });
 
@@ -75,15 +79,15 @@ export class UserAuthService {
       include: { user: true },
     });
 
-    if (!account?.user) {
+    if (!account?.user || account.role !== 'USER') {
       throw new ForbiddenException('Access Denied - Invalid refresh token');
     }
 
     const tokens = await this.generateTokens({
       accountId: account.id,
       email: account.email,
-      role: account.user.role,
       userId: account.user.id,
+      role: account.role,
     });
 
     await this.updateRefreshToken(account.id, tokens.refresh_token);
@@ -102,26 +106,25 @@ export class UserAuthService {
   private async generateTokens({
     userId,
     email,
-    role,
     accountId,
+    role,
   }: {
     accountId: string;
     userId: string;
     email: string;
-    role: UserRole;
+    role: string;
   }) {
     const payload = {
       sub: accountId,
       email,
-      role,
-      type: 'user' as const,
       userId,
+      role,
     };
 
     const [access_token, refresh_token] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
+        expiresIn: '1h',
       }),
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>(
@@ -135,9 +138,7 @@ export class UserAuthService {
       }),
     ]);
 
-    const expiresIn = this.parseExpirationTime(
-      this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
-    );
+    const expiresIn = this.parseExpirationTime('1h');
 
     return {
       access_token,

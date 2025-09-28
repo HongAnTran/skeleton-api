@@ -10,14 +10,32 @@ export class LoggingMiddleware implements NestMiddleware {
     const userAgent = request.get('User-Agent') || '';
     const startTime = Date.now();
 
+    // Log cache-related headers from client
+    const ifNoneMatch = request.get('If-None-Match');
+    const ifModifiedSince = request.get('If-Modified-Since');
+    const cacheControl = request.get('Cache-Control');
+
+    if (ifNoneMatch || ifModifiedSince || cacheControl) {
+      this.logger.warn(
+        `🔍 Cache headers detected - ${method} ${originalUrl} - If-None-Match: ${ifNoneMatch}, If-Modified-Since: ${ifModifiedSince}, Cache-Control: ${cacheControl}`,
+      );
+    }
+
     response.on('close', () => {
       const { statusCode } = response;
       const contentLength = response.get('Content-Length');
       const responseTime = Date.now() - startTime;
 
-      this.logger.log(
-        `${method} ${originalUrl} ${statusCode} ${contentLength} - ${userAgent} ${ip} - ${responseTime}ms`,
-      );
+      // Log status 304 with special attention
+      if (statusCode === 304) {
+        this.logger.warn(
+          `⚠️  ${method} ${originalUrl} ${statusCode} ${contentLength} - ${userAgent} ${ip} - ${responseTime}ms [NOT MODIFIED]`,
+        );
+      } else {
+        this.logger.log(
+          `${method} ${originalUrl} ${statusCode} ${contentLength} - ${userAgent} ${ip} - ${responseTime}ms`,
+        );
+      }
     });
 
     next();

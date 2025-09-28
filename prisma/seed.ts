@@ -1,18 +1,41 @@
 import { PasswordUtil } from './../src/common/utils/password.util';
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 const prisma = new PrismaClient();
 
 async function main() {
-  await prisma.user.deleteMany({});
-
-  const user = await prisma.user.create({
+  const account = await prisma.account.create({
     data: {
-      name: 'Admin User',
-      role: UserRole.ADMIN,
+      email: 'tranhongankrn.2001@gmail.com',
+      passwordHash: await PasswordUtil.hash('ANlol2001@'),
+      role: 'ADMIN',
+    },
+  });
+
+  await prisma.user.create({
+    data: {
+      name: 'Super Admin',
       account: {
-        create: {
-          email: 'admin@example.com',
-          passwordHash: await PasswordUtil.hash('admin123456'),
+        connect: {
+          id: account.id,
+        },
+      },
+    },
+  });
+
+  const account2 = await prisma.account.create({
+    data: {
+      email: 'hitaothom@gmail.com',
+      passwordHash: await PasswordUtil.hash('admin123456@'),
+      role: 'USER',
+    },
+  });
+
+  await prisma.user.create({
+    data: {
+      name: 'HiTaoThom',
+      account: {
+        connect: {
+          id: account2.id,
         },
       },
     },

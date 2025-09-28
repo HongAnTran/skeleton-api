@@ -18,7 +18,7 @@ export class PaginationDto {
     description: 'Number of items per page',
     default: 10,
     minimum: 1,
-    maximum: 100,
+    maximum: 1000,
   })
   @IsOptional()
   @Transform(({ value }) => parseInt(value))

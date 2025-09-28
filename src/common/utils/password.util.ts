@@ -7,7 +7,7 @@ export class PasswordUtil {
    * Hash a plain text password
    */
   static async hash(password: string): Promise<string> {
-    return bcrypt.hash(password, this.saltRounds);
+    return bcrypt.hash(password, this.saltRounds || 12);
   }
 
   /**

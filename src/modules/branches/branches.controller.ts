@@ -7,7 +7,6 @@ import {
   Param,
   Delete,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,8 +19,9 @@ import { BranchesService } from './branches.service';
 import { CreateBranchDto } from './dto/create-branch.dto';
 import { UpdateBranchDto } from './dto/update-branch.dto';
 import { Branch } from './entities/branch.entity';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PaginationDto } from '../../common/dtos/pagination.dto';
+import { User } from 'src/common/decorators/user.decorator';
+import { JwtPayload } from 'src/common/decorators/user.decorator';
 
 @ApiTags('Branches')
 @ApiBearerAuth()
@@ -32,8 +32,8 @@ export class BranchesController {
   @Post()
   @ApiOperation({ summary: 'Create a new branch' })
   @ApiResponse({ status: 201, type: Branch })
-  create(@Body() createBranchDto: CreateBranchDto) {
-    return this.branchesService.create(createBranchDto);
+  create(@User() user: JwtPayload, @Body() createBranchDto: CreateBranchDto) {
+    return this.branchesService.create(user.userId, createBranchDto);
   }
 
   @Get()
@@ -41,27 +41,18 @@ export class BranchesController {
   @ApiResponse({ status: 200, type: [Branch] })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'userId', required: false, type: String })
   async findAll(
+    @User() user: JwtPayload,
     @Query() paginationDto: PaginationDto,
-    @Query('userId') userId?: string,
   ) {
     const { page, limit } = paginationDto;
     const skip = (page - 1) * limit;
-
     let branches, total;
 
-    if (userId) {
-      [branches, total] = await Promise.all([
-        this.branchesService.findByUserId(userId, skip, limit),
-        this.branchesService.count(userId),
-      ]);
-    } else {
-      [branches, total] = await Promise.all([
-        this.branchesService.findAll(skip, limit),
-        this.branchesService.count(),
-      ]);
-    }
+    [branches, total] = await Promise.all([
+      this.branchesService.findByUserId(user.userId, skip, limit),
+      this.branchesService.count(user.userId),
+    ]);
 
     return {
       data: branches,
@@ -79,13 +70,6 @@ export class BranchesController {
   @ApiResponse({ status: 200, type: Branch })
   findOne(@Param('id') id: string) {
     return this.branchesService.findOne(id);
-  }
-
-  @Get('user/:userId')
-  @ApiOperation({ summary: 'Get branches by user ID' })
-  @ApiResponse({ status: 200, type: [Branch] })
-  findByUserId(@Param('userId') userId: string) {
-    return this.branchesService.findByUserId(userId);
   }
 
   @Patch(':id')

@@ -1,8 +1,7 @@
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { Module, MiddlewareConsumer } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
+import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
-import { JwtModule } from '@nestjs/jwt';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -17,6 +16,7 @@ import { EmployeesModule } from './modules/employees/employees.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { ShiftSlotsModule } from './modules/shift-slots/shift-slots.module';
+import { ShiftSlotTypesModule } from './modules/shift-slot-types/shift-slot-types.module';
 import { ShiftSignupsModule } from './modules/shift-signups/shift-signups.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 
@@ -27,6 +27,7 @@ import { validate } from './config/config.validation';
 
 import { AllExceptionsFilter } from './common/exceptions/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
+import { NoCacheInterceptor } from './common/interceptors/no-cache.interceptor';
 
 @Module({
   imports: [
@@ -53,6 +54,7 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
     BranchesModule,
     DepartmentsModule,
     ShiftSlotsModule,
+    ShiftSlotTypesModule,
     ShiftSignupsModule,
     TasksModule,
   ],
@@ -67,9 +69,13 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
+    // {
+    //   provide: APP_FILTER,
+    //   useClass: AllExceptionsFilter,
+    // },
     {
-      provide: APP_FILTER,
-      useClass: AllExceptionsFilter,
+      provide: APP_INTERCEPTOR,
+      useClass: NoCacheInterceptor,
     },
   ],
 })

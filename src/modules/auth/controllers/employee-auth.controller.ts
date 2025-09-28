@@ -57,9 +57,6 @@ export class EmployeeAuthController {
   @ApiOperation({ summary: 'Employee logout' })
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
   async logout(@Request() req: any) {
-    if (req.user.type !== 'employee') {
-      throw new Error('Invalid token type for employee authentication');
-    }
     return this.employeeAuthService.logout(req.user.accountId);
   }
 
@@ -69,10 +66,6 @@ export class EmployeeAuthController {
   @ApiOperation({ summary: 'Get current employee information' })
   @ApiResponse({ status: 200, type: EmployeeData })
   async getCurrentEmployee(@Request() req: any) {
-    if (req.user.type !== 'employee') {
-      throw new Error('Invalid token type for employee authentication');
-    }
-
     const employee = await this.employeeAuthService.getCurrentEmployee(
       req.user.employeeId,
     );

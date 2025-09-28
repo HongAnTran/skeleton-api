@@ -7,7 +7,6 @@ import {
   Param,
   Delete,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,10 +18,11 @@ import {
 import { ShiftSlotsService } from './shift-slots.service';
 import { CreateShiftSlotDto } from './dto/create-shift-slot.dto';
 import { UpdateShiftSlotDto } from './dto/update-shift-slot.dto';
+import { QueryShiftSlotDto } from './dto/query-shift-slot.dto';
 import { ShiftSlot } from './entities/shift-slot.entity';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { PaginationDto } from '../../common/dtos/pagination.dto';
 import { Prisma } from '@prisma/client';
+import { JwtPayload, User } from 'src/common/decorators/user.decorator';
+import { QueryShiftSlotEmployeeDto } from 'src/modules/shift-slots/dto/query-shift-slot-employee.dto';
 
 @ApiTags('Shift Slots')
 @ApiBearerAuth()
@@ -33,37 +33,44 @@ export class ShiftSlotsController {
   @Post()
   @ApiOperation({ summary: 'Create a new shift slot' })
   @ApiResponse({ status: 201, type: ShiftSlot })
-  create(@Body() createShiftSlotDto: CreateShiftSlotDto) {
-    return this.shiftSlotsService.create(createShiftSlotDto);
+  create(
+    @User() user: JwtPayload,
+    @Body() createShiftSlotDto: CreateShiftSlotDto,
+  ) {
+    return this.shiftSlotsService.create(user.userId, createShiftSlotDto);
+  }
+
+  @Post('many')
+  @ApiOperation({ summary: 'Create many shift slots' })
+  @ApiResponse({ status: 201, type: ShiftSlot })
+  createMany(
+    @User() user: JwtPayload,
+    @Body() createShiftSlotDto: CreateShiftSlotDto,
+  ) {
+    return this.shiftSlotsService.createMany(user.userId, createShiftSlotDto);
   }
 
   @Get()
   @ApiOperation({ summary: 'Get all shift slots with pagination' })
   @ApiResponse({ status: 200, type: [ShiftSlot] })
-  @ApiQuery({ name: 'page', required: false, type: Number })
-  @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'branchId', required: false, type: String })
-  @ApiQuery({ name: 'userId', required: false, type: String })
-  @ApiQuery({ name: 'startDate', required: false, type: String })
-  @ApiQuery({ name: 'endDate', required: false, type: String })
   async findAll(
-    @Query() paginationDto: PaginationDto,
-    @Query('branchId') branchId?: string,
-    @Query('userId') userId?: string,
-    @Query('startDate') startDate?: string,
-    @Query('endDate') endDate?: string,
+    @User() user: JwtPayload,
+    @Query() queryDto: QueryShiftSlotDto,
   ) {
-    const { page, limit } = paginationDto;
-    const skip = (page - 1) * limit;
-
+    const { page, limit, branchId, typeId, startDate, endDate, skip } =
+      queryDto;
+    const userId = user.userId;
     let shiftSlots, total;
 
-    const where: Prisma.ShiftSlotWhereInput = {};
+    const where: Prisma.ShiftSlotWhereInput = {
+      userId,
+    };
+
     if (branchId) {
       where.branchId = branchId;
     }
-    if (userId) {
-      where.userId = userId;
+    if (typeId) {
+      where.typeId = typeId;
     }
     if (startDate && endDate) {
       where.date = {
@@ -85,6 +92,25 @@ export class ShiftSlotsController {
         totalPages: Math.ceil(total / limit),
       },
     };
+  }
+
+  @Get('employee')
+  @ApiOperation({ summary: 'Get all shift slots with pagination' })
+  @ApiResponse({ status: 200, type: [ShiftSlot] })
+  async findAllEmployee(
+    @User() user: JwtPayload,
+    @Query() queryDto: QueryShiftSlotEmployeeDto,
+  ) {
+    const { typeId, startDate, endDate } = queryDto;
+    const userId = user.userId;
+    const employeeId = user.employeeId;
+    return this.shiftSlotsService.findAllByEmployee(employeeId, userId, {
+      typeId,
+      date: {
+        gte: new Date(startDate),
+        lte: new Date(endDate),
+      },
+    });
   }
 
   @Get(':id')

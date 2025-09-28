@@ -25,15 +25,22 @@ export class EmployeeAuthService {
 
     const account = await this.prisma.account.findUnique({
       where: { email },
-      include: { employee: true },
+      include: {
+        employee: true,
+      },
     });
 
-    if (!account || !account.passwordHash || !account.employee) {
-      throw new UnauthorizedException('Invalid credentials');
+    if (
+      !account ||
+      !account.passwordHash ||
+      !account.employee ||
+      account.role !== 'EMPLOYEE'
+    ) {
+      throw new ForbiddenException('Sai tài khoản hoặc mật khẩu');
     }
 
     if (!account.employee.active) {
-      throw new UnauthorizedException('Employee account is inactive');
+      throw new ForbiddenException('Tài khoản nhân viên đã bị vô hiệu hóa');
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -41,13 +48,18 @@ export class EmployeeAuthService {
       account.passwordHash,
     );
     if (!isPasswordValid) {
-      throw new UnauthorizedException('Invalid credentials');
+      throw new ForbiddenException('Sai mật khẩu');
     }
+    const owner = await this.prisma.user.findUnique({
+      where: { id: account.employee.userId },
+    });
 
     const tokens = await this.generateTokens({
       accountId: account.id,
       email: account.email,
       employeeId: account.employee.id,
+      role: account.role,
+      userId: owner.id,
     });
 
     await this.updateRefreshToken(account.id, tokens.refresh_token);
@@ -63,7 +75,6 @@ export class EmployeeAuthService {
         user: {
           select: {
             name: true,
-            role: true,
           },
         },
       },
@@ -92,7 +103,7 @@ export class EmployeeAuthService {
       include: { employee: true },
     });
 
-    if (!account?.employee) {
+    if (!account?.employee || account.role !== 'EMPLOYEE') {
       throw new ForbiddenException('Access Denied - Invalid refresh token');
     }
 
@@ -101,11 +112,16 @@ export class EmployeeAuthService {
         'Access Denied - Employee account is inactive',
       );
     }
+    const owner = await this.prisma.user.findUnique({
+      where: { id: account.employee.userId },
+    });
 
     const tokens = await this.generateTokens({
       accountId: account.id,
       email: account.email,
       employeeId: account.employee.id,
+      role: account.role,
+      userId: owner.id,
     });
 
     await this.updateRefreshToken(account.id, tokens.refresh_token);
@@ -125,22 +141,27 @@ export class EmployeeAuthService {
     employeeId,
     email,
     accountId,
+    role,
+    userId,
   }: {
     accountId: string;
     employeeId: string;
     email: string;
+    role: string;
+    userId: string;
   }) {
     const payload = {
       sub: accountId,
       email,
-      type: 'employee' as const,
       employeeId,
+      role,
+      userId,
     };
 
     const [access_token, refresh_token] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
+        expiresIn: '1h',
       }),
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>(
@@ -154,9 +175,7 @@ export class EmployeeAuthService {
       }),
     ]);
 
-    const expiresIn = this.parseExpirationTime(
-      this.configService.get<string>('JWT_EXPIRES_IN', '15m'),
-    );
+    const expiresIn = this.parseExpirationTime('1h');
 
     return {
       access_token,

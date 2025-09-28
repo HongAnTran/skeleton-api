@@ -1,34 +1,20 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  IsString,
-  IsOptional,
-  IsBoolean,
-  IsInt,
-  Min,
-  IsUUID,
-} from 'class-validator';
+import { IsString, IsOptional, IsBoolean } from 'class-validator';
 
 export class CreateEmployeeDto {
-  @ApiProperty()
-  @IsString()
-  @IsUUID()
-  userId: string;
-
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  @IsUUID()
   branchId?: string;
 
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()
-  @IsUUID()
   departmentId?: string;
 
   @ApiProperty({ example: 'John Doe' })
   @IsString()
-  fullName: string;
+  name: string;
 
   @ApiProperty({ example: 'employee@example.com' })
   @IsString()

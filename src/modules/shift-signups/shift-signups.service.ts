@@ -5,65 +5,52 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateShiftSignupDto } from './dto/create-shift-signup.dto';
-import { UpdateShiftSignupDto } from './dto/update-shift-signup.dto';
-import { UpdateStatusDto } from './dto/update-status.dto';
-import { Prisma, ShiftSignupStatus } from '@prisma/client';
+import { Prisma } from '@prisma/client';
 
 @Injectable()
 export class ShiftSignupsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createShiftSignupDto: CreateShiftSignupDto) {
+  async create(employeeId: string, createShiftSignupDto: CreateShiftSignupDto) {
     const shiftSlot = await this.prisma.shiftSlot.findUnique({
       where: { id: createShiftSignupDto.slotId },
       include: { signups: true },
     });
 
     if (!shiftSlot) {
-      throw new NotFoundException('Shift slot not found');
+      throw new NotFoundException('Ca làm việc không tồn tại');
     }
 
-    const confirmedSignups = shiftSlot.signups.filter(
-      (signup) => signup.status === ShiftSignupStatus.CONFIRMED,
-    );
-
-    if (confirmedSignups.length >= shiftSlot.capacity) {
-      throw new BadRequestException('Shift slot is already at full capacity');
+    if (shiftSlot.signups.length >= shiftSlot.capacity) {
+      throw new BadRequestException(
+        `Ca làm việc đã đầy, tối đa ${shiftSlot.capacity} nhân viên`,
+      );
     }
 
     const existingSignup = await this.prisma.shiftSignup.findFirst({
       where: {
-        employeeId: createShiftSignupDto.employeeId,
+        employeeId: employeeId,
         slotId: createShiftSignupDto.slotId,
-        status: {
-          not: ShiftSignupStatus.CANCELLED,
-        },
+        isCanceled: false,
       },
     });
 
     if (existingSignup) {
+      throw new BadRequestException('Bạn đã đăng ký ca làm việc này');
+    }
+
+    const date = new Date(shiftSlot.date);
+    const currentDate = new Date();
+    if (date < currentDate) {
       throw new BadRequestException(
-        'Employee has already signed up for this shift slot',
+        'Không thể đăng ký ca làm việc trong quá khứ',
       );
     }
 
     return this.prisma.shiftSignup.create({
-      data: createShiftSignupDto,
-      include: {
-        employee: {
-          include: {
-            user: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
-        slot: {
-          include: {
-            branch: true,
-          },
-        },
+      data: {
+        employeeId: employeeId,
+        slotId: createShiftSignupDto.slotId,
       },
     });
   }
@@ -90,112 +77,69 @@ export class ShiftSignupsService {
         slot: {
           include: {
             branch: true,
+            type: true,
           },
         },
       },
     });
   }
 
-  async findOne(id: string) {
+  async cancel(employeeId: string, id: string, cancelReason: string) {
     const shiftSignup = await this.prisma.shiftSignup.findUnique({
-      where: { id },
+      where: { id, employeeId },
       include: {
-        employee: {
-          include: {
-            user: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
-        slot: {
-          include: {
-            branch: true,
-          },
-        },
+        slot: true,
       },
     });
-
     if (!shiftSignup) {
       throw new NotFoundException(`Shift signup with ID ${id} not found`);
     }
 
-    return shiftSignup;
-  }
-
-  async updateStatus(id: string, updateStatusDto: UpdateStatusDto) {
-    const shiftSignup = await this.prisma.shiftSignup.findUnique({
-      where: { id },
-      include: { slot: { include: { signups: true } } },
-    });
-
-    if (!shiftSignup) {
-      throw new NotFoundException(`Shift signup with ID ${id} not found`);
-    }
-
-    if (updateStatusDto.status === ShiftSignupStatus.CONFIRMED) {
-      const confirmedSignups = shiftSignup.slot.signups.filter(
-        (signup) =>
-          signup.status === ShiftSignupStatus.CONFIRMED && signup.id !== id,
-      );
-
-      if (confirmedSignups.length >= shiftSignup.slot.capacity) {
-        throw new BadRequestException('Shift slot is already at full capacity');
-      }
+    if (
+      shiftSignup.slot.date <
+      new Date(new Date().setDate(new Date().getDate() - 1))
+    ) {
+      throw new BadRequestException('Không thể hủy ca làm việc trước 1 ngày');
     }
 
     return this.prisma.shiftSignup.update({
-      where: { id },
-      data: { status: updateStatusDto.status },
-      include: {
-        employee: {
-          include: {
-            user: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
-        slot: {
-          include: {
-            branch: true,
-          },
-        },
+      where: { id, employeeId },
+      data: {
+        isCanceled: true,
+        canceledAt: new Date(),
+        cancelReason: cancelReason,
       },
     });
   }
 
-  async update(id: string, updateShiftSignupDto: UpdateShiftSignupDto) {
+  async remove(userId: string, id: string) {
     try {
-      return await this.prisma.shiftSignup.update({
+      const shiftSignup = await this.prisma.shiftSignup.findUnique({
         where: { id },
-        data: updateShiftSignupDto,
         include: {
-          employee: {
-            include: {
-              user: {
-                select: {
-                  name: true,
-                },
-              },
-            },
-          },
-          slot: {
-            include: {
-              branch: true,
-            },
-          },
+          slot: true,
         },
       });
-    } catch (error) {
-      throw new NotFoundException(`Shift signup with ID ${id} not found`);
-    }
-  }
+      const slot = await this.prisma.shiftSlot.findUnique({
+        where: { id: shiftSignup.slotId, userId },
+      });
 
-  async remove(id: string) {
-    try {
+      if (!slot) {
+        throw new NotFoundException(
+          `Shift slot with ID ${shiftSignup.slotId} not found`,
+        );
+      }
+
+      if (!shiftSignup) {
+        throw new NotFoundException(`Shift signup with ID ${id} not found`);
+      }
+
+      if (shiftSignup.slot.date < new Date()) {
+        throw new BadRequestException(
+          'Không thể xóa lịch làm việc trong quá khứ',
+        );
+      }
+
       return await this.prisma.shiftSignup.delete({
         where: { id },
       });

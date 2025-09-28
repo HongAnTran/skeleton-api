@@ -55,9 +55,6 @@ export class UserAuthController {
   @ApiOperation({ summary: 'User logout' })
   @ApiResponse({ status: 200, description: 'Logged out successfully' })
   async logout(@Request() req: any) {
-    if (req.user.type !== 'user') {
-      throw new Error('Invalid token type for user authentication');
-    }
     return this.userAuthService.logout(req.user.accountId);
   }
 
@@ -67,10 +64,6 @@ export class UserAuthController {
   @ApiOperation({ summary: 'Get current user information' })
   @ApiResponse({ status: 200, type: UserData })
   async getCurrentUser(@Request() req: any) {
-    if (req.user.type !== 'user') {
-      throw new Error('Invalid token type for user authentication');
-    }
-
     const user = await this.userAuthService.getCurrentUser(req.user.userId);
     return user;
   }

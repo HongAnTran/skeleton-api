@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateShiftSlotDto } from './dto/create-shift-slot.dto';
 import { UpdateShiftSlotDto } from './dto/update-shift-slot.dto';
@@ -8,15 +12,95 @@ import { Prisma } from '@prisma/client';
 export class ShiftSlotsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createShiftSlotDto: CreateShiftSlotDto) {
-    return this.prisma.shiftSlot.create({
-      data: {
-        ...createShiftSlotDto,
-        startDate: new Date(createShiftSlotDto.startDate),
-        endDate: new Date(createShiftSlotDto.endDate),
-        date: new Date(createShiftSlotDto.date),
+  async create(userId: string, createShiftSlotDto: CreateShiftSlotDto) {
+    const { typeId, branchId, capacity, date, note } = createShiftSlotDto;
+    const existingSlot = await this.prisma.shiftSlot.findFirst({
+      where: {
+        date: new Date(date),
+        branchId,
+        typeId,
       },
     });
+
+    if (existingSlot) {
+      throw new BadRequestException('Đã có ca làm việc trong ngày này');
+    }
+
+    return this.prisma.shiftSlot.create({
+      data: {
+        capacity,
+        user: {
+          connect: {
+            id: userId,
+          },
+        },
+        branch: {
+          connect: {
+            id: branchId,
+          },
+        },
+        date: new Date(date),
+        note,
+        type: {
+          connect: {
+            id: typeId,
+          },
+        },
+      },
+    });
+  }
+
+  async createMany(userId: string, createShiftSlotDto: CreateShiftSlotDto) {
+    const { date, endDate, branchId, typeId, capacity, note } =
+      createShiftSlotDto;
+    if (endDate) {
+      const startDate = new Date(date);
+      const endDateValue = new Date(endDate);
+      if (endDateValue < startDate) {
+        throw new BadRequestException(
+          'Ngày kết thúc phải lớn hơn ngày bắt đầu',
+        );
+      }
+
+      const existingSlot = await this.prisma.shiftSlot.findFirst({
+        where: {
+          date: {
+            gte: startDate,
+            lte: endDateValue,
+          },
+          branchId,
+          typeId,
+        },
+      });
+      if (existingSlot) {
+        throw new BadRequestException(
+          'Đã có ca làm việc trong khoảng thời gian này',
+        );
+      }
+
+      const dates = [];
+      const currentDate = new Date(startDate);
+
+      while (currentDate <= endDateValue) {
+        dates.push(new Date(currentDate));
+        currentDate.setDate(currentDate.getDate() + 1);
+      }
+
+      const data = dates.map((date) => ({
+        date,
+        capacity,
+        userId,
+        branchId,
+        typeId,
+        note,
+      }));
+
+      return await this.prisma.shiftSlot.createMany({
+        data,
+      });
+    } else {
+      throw new BadRequestException('Ngày kết thúc không được để trống');
+    }
   }
 
   async findAll(
@@ -29,27 +113,81 @@ export class ShiftSlotsService {
       skip,
       take,
       include: {
-        user: {
+        branch: {
           select: {
             id: true,
             name: true,
-            role: true,
           },
         },
-        branch: true,
         signups: {
-          include: {
+          select: {
+            id: true,
+            isCanceled: true,
+            canceledAt: true,
+            cancelReason: true,
             employee: {
               select: {
                 id: true,
-                fullName: true,
+                name: true,
               },
             },
           },
         },
-        _count: {
+        type: {
           select: {
-            signups: true,
+            name: true,
+            startDate: true,
+            endDate: true,
+            id: true,
+          },
+        },
+      },
+    });
+  }
+
+  async findAllByEmployee(
+    employeeId: string,
+    userId: string,
+    where: Prisma.ShiftSlotWhereInput,
+  ) {
+    const whereNew = { ...where };
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      include: {
+        branch: true,
+      },
+    });
+
+    if (!employee) {
+      throw new NotFoundException(`Employee with ID ${employeeId} not found`);
+    }
+
+    whereNew.branchId = employee.branchId;
+    whereNew.userId = userId;
+
+    return this.prisma.shiftSlot.findMany({
+      where: whereNew,
+      include: {
+        signups: {
+          where: {
+            isCanceled: false,
+          },
+          select: {
+            id: true,
+            employee: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+        type: {
+          select: {
+            name: true,
+            startDate: true,
+            endDate: true,
+            id: true,
           },
         },
       },
@@ -60,25 +198,29 @@ export class ShiftSlotsService {
     const shiftSlot = await this.prisma.shiftSlot.findUnique({
       where: { id },
       include: {
-        user: {
+        branch: {
           select: {
             id: true,
             name: true,
-            role: true,
           },
         },
-        branch: true,
         signups: {
-          include: {
+          select: {
+            id: true,
             employee: {
-              include: {
-                user: {
-                  select: {
-                    name: true,
-                  },
-                },
+              select: {
+                id: true,
+                name: true,
               },
             },
+          },
+        },
+        type: {
+          select: {
+            name: true,
+            startDate: true,
+            endDate: true,
+            id: true,
           },
         },
       },
@@ -93,13 +235,23 @@ export class ShiftSlotsService {
 
   async update(id: string, updateShiftSlotDto: UpdateShiftSlotDto) {
     try {
+      const shiftSlot = await this.prisma.shiftSlot.findUnique({
+        where: { id },
+        include: {
+          signups: true,
+        },
+      });
+      if (!shiftSlot) {
+        throw new NotFoundException(`Shift slot with ID ${id} not found`);
+      }
+
+      if (shiftSlot.signups.length > 0) {
+        throw new BadRequestException(
+          'Không thể cập nhật ca làm việc đã có đăng ký',
+        );
+      }
+
       const updateData = { ...updateShiftSlotDto } as any;
-      if (updateShiftSlotDto.startDate) {
-        updateData.startDate = new Date(updateShiftSlotDto.startDate);
-      }
-      if (updateShiftSlotDto.endDate) {
-        updateData.endDate = new Date(updateShiftSlotDto.endDate);
-      }
       if (updateShiftSlotDto.date) {
         updateData.date = new Date(updateShiftSlotDto.date);
       }
@@ -107,17 +259,6 @@ export class ShiftSlotsService {
       return await this.prisma.shiftSlot.update({
         where: { id },
         data: updateData,
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              role: true,
-            },
-          },
-          branch: true,
-          signups: true,
-        },
       });
     } catch (error) {
       throw new NotFoundException(`Shift slot with ID ${id} not found`);
@@ -126,6 +267,22 @@ export class ShiftSlotsService {
 
   async remove(id: string) {
     try {
+      const shiftSlot = await this.prisma.shiftSlot.findUnique({
+        where: { id },
+        include: {
+          signups: true,
+        },
+      });
+      if (!shiftSlot) {
+        throw new NotFoundException(`Shift slot with ID ${id} not found`);
+      }
+
+      if (shiftSlot.signups.length > 0) {
+        throw new BadRequestException(
+          'Không thể xóa ca làm việc đã có đăng ký',
+        );
+      }
+
       return await this.prisma.shiftSlot.delete({
         where: { id },
       });

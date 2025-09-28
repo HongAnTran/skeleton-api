@@ -3,72 +3,57 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   Query,
-  UseGuards,
+  Patch,
+  BadRequestException,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-  ApiBearerAuth,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { ShiftSignupsService } from './shift-signups.service';
 import { CreateShiftSignupDto } from './dto/create-shift-signup.dto';
-import { UpdateShiftSignupDto } from './dto/update-shift-signup.dto';
 import { ShiftSignup } from './entities/shift-signup.entity';
 import { PaginationDto } from '../../common/dtos/pagination.dto';
-import { Prisma, ShiftSignupStatus } from '@prisma/client';
-import { UpdateStatusDto } from 'src/modules/shift-signups/dto/update-status.dto';
+import { Prisma } from '@prisma/client';
+import { User, JwtPayload } from '../../common/decorators/user.decorator';
 
 @ApiTags('Shift Signups')
-@ApiBearerAuth()
 @Controller('shift-signups')
 export class ShiftSignupsController {
   constructor(private readonly shiftSignupsService: ShiftSignupsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Create a new shift signup' })
+  @ApiOperation({ summary: 'Create a new shift signup - Employee only' })
   @ApiResponse({ status: 201, type: ShiftSignup })
-  create(@Body() createShiftSignupDto: CreateShiftSignupDto) {
-    return this.shiftSignupsService.create(createShiftSignupDto);
+  create(
+    @User() user: JwtPayload,
+    @Body() createShiftSignupDto: CreateShiftSignupDto,
+  ) {
+    return this.shiftSignupsService.create(
+      user.employeeId,
+      createShiftSignupDto,
+    );
   }
 
   @Get()
-  @ApiOperation({ summary: 'Get all shift signups with pagination' })
+  @ApiOperation({
+    summary: 'Get all shift signups with pagination - Employee only',
+  })
   @ApiResponse({ status: 200, type: [ShiftSignup] })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'employeeId', required: false, type: String })
-  @ApiQuery({ name: 'slotId', required: false, type: String })
-  @ApiQuery({
-    name: 'status',
-    required: false,
-    enum: ShiftSignupStatus,
-  })
-  async findAll(
+  async findMySignups(
+    @User() user: JwtPayload,
     @Query() paginationDto: PaginationDto,
-    @Query('employeeId') employeeId?: string,
-    @Query('slotId') slotId?: string,
-    @Query('status') status?: ShiftSignupStatus,
   ) {
     const { page, limit } = paginationDto;
     const skip = (page - 1) * limit;
-
+    const employeeId = user.employeeId;
     let signups, total;
 
     const where: Prisma.ShiftSignupWhereInput = {};
     if (employeeId) {
       where.employeeId = employeeId;
-    }
-    if (slotId) {
-      where.slotId = slotId;
-    }
-    if (status) {
-      where.status = status;
     }
 
     [signups, total] = await Promise.all([
@@ -87,40 +72,31 @@ export class ShiftSignupsController {
     };
   }
 
-  @Get(':id')
-  @ApiOperation({ summary: 'Get shift signup by ID' })
-  @ApiResponse({ status: 200, type: ShiftSignup })
-  findOne(@Param('id') id: string) {
-    return this.shiftSignupsService.findOne(id);
-  }
-
   @Patch(':id')
-  @ApiOperation({ summary: 'Update shift signup by ID' })
+  @ApiOperation({ summary: 'Cancel shift signup by ID - Employee only' })
   @ApiResponse({ status: 200, type: ShiftSignup })
-  update(
+  cancel(
+    @User() user: JwtPayload,
     @Param('id') id: string,
-    @Body() updateShiftSignupDto: UpdateShiftSignupDto,
+    @Body() body: { cancelReason: string },
   ) {
-    return this.shiftSignupsService.update(id, updateShiftSignupDto);
-  }
-
-  @Patch(':id/status')
-  @ApiOperation({ summary: 'Update shift signup status' })
-  @ApiResponse({ status: 200, type: ShiftSignup })
-  updateStatus(
-    @Param('id') id: string,
-    @Body() updateStatusDto: UpdateStatusDto,
-  ) {
-    return this.shiftSignupsService.updateStatus(id, updateStatusDto);
+    if (!body.cancelReason) {
+      throw new BadRequestException('Lý do hủy ca làm việc là bắt buộc');
+    }
+    return this.shiftSignupsService.cancel(
+      user.employeeId,
+      id,
+      body.cancelReason,
+    );
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Delete shift signup by ID' })
+  @ApiOperation({ summary: 'Delete shift signup by ID - Admin only' })
   @ApiResponse({
     status: 200,
     description: 'Shift signup deleted successfully',
   })
-  remove(@Param('id') id: string) {
-    return this.shiftSignupsService.remove(id);
+  remove(@User() user: JwtPayload, @Param('id') id: string) {
+    return this.shiftSignupsService.remove(user.userId, id);
   }
 }

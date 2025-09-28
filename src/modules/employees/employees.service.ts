@@ -9,16 +9,18 @@ import { Prisma } from '@prisma/client';
 export class EmployeesService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createEmployeeDto: CreateEmployeeDto) {
+  async create(userId: string, createEmployeeDto: CreateEmployeeDto) {
     const { password, provider, email, ...employeeData } = createEmployeeDto;
     return this.prisma.employee.create({
       data: {
+        userId,
         ...employeeData,
         account: {
           create: {
             email: email,
             passwordHash: await PasswordUtil.hash(password),
             provider: provider || 'local',
+            role: 'EMPLOYEE',
           },
         },
       },
@@ -35,20 +37,29 @@ export class EmployeesService {
       skip,
       take,
       include: {
-        user: {
+        account: {
+          select: {
+            id: true,
+            email: true,
+          },
+        },
+        branch: {
           select: {
             id: true,
             name: true,
-            role: true,
           },
         },
-        branch: true,
+        department: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         shiftSignups: {
           include: {
             slot: true,
           },
         },
-        tasks: true,
       },
     });
   }
@@ -61,7 +72,6 @@ export class EmployeesService {
           select: {
             id: true,
             name: true,
-            role: true,
           },
         },
         branch: true,
@@ -102,7 +112,6 @@ export class EmployeesService {
           select: {
             id: true,
             name: true,
-            role: true,
           },
         },
         branch: true,
@@ -113,20 +122,24 @@ export class EmployeesService {
 
   async update(id: string, updateEmployeeDto: UpdateEmployeeDto) {
     try {
-      const { password, provider, ...employeeData } = updateEmployeeDto;
+      const { password, provider, email, ...employeeData } = updateEmployeeDto;
       return await this.prisma.employee.update({
         where: { id },
         data: {
           ...employeeData,
           account: {
             update: {
-              passwordHash: await PasswordUtil.hash(password),
-              provider: provider || 'local',
+              email: email || undefined,
+              passwordHash: password
+                ? await PasswordUtil.hash(password)
+                : undefined,
+              provider: provider || undefined,
             },
           },
         },
       });
     } catch (error) {
+      console.log(error);
       throw new NotFoundException(`Employee with ID ${id} not found`);
     }
   }

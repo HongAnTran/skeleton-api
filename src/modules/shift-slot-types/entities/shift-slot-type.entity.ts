@@ -1,23 +1,20 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export class ShiftSignup {
+export class ShiftSlotType {
   @ApiProperty()
   id: string;
 
   @ApiProperty()
-  employeeId: string;
+  userId: string;
 
   @ApiProperty()
-  slotId: string;
+  name: string;
 
   @ApiProperty()
-  isCanceled: boolean;
+  startDate: Date;
 
   @ApiProperty()
-  canceledAt: Date;
-
-  @ApiProperty()
-  cancelReason: string;
+  endDate: Date;
 
   @ApiProperty()
   createdAt: Date;
@@ -27,8 +24,8 @@ export class ShiftSignup {
 
   // Relations
   @ApiProperty({ required: false })
-  employee?: any;
+  user?: any;
 
   @ApiProperty({ required: false })
-  slot?: any;
+  shiftSlots?: any[];
 }

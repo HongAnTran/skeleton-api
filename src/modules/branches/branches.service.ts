@@ -7,9 +7,9 @@ import { UpdateBranchDto } from './dto/update-branch.dto';
 export class BranchesService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createBranchDto: CreateBranchDto) {
+  async create(userId: string, createBranchDto: CreateBranchDto) {
     return this.prisma.branch.create({
-      data: createBranchDto,
+      data: { ...createBranchDto, userId },
     });
   }
 

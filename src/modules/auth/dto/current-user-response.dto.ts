@@ -1,5 +1,4 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { UserRole } from '@prisma/client';
 
 export class UserData {
   @ApiProperty()
@@ -13,9 +12,6 @@ export class UserData {
 
   @ApiProperty({ required: false })
   phone?: string;
-
-  @ApiProperty({ enum: UserRole })
-  role: UserRole;
 
   @ApiProperty()
   createdAt: Date;
@@ -66,7 +62,6 @@ export class EmployeeData {
     id: string;
     email: string;
     name?: string;
-    role: UserRole;
   };
 
   @ApiProperty({ required: false })

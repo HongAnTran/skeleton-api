@@ -14,12 +14,12 @@ export class UsersService {
       data: {
         name: userData.name,
         phone: userData.phone,
-        role: userData.role,
         account: {
           create: {
             passwordHash: await PasswordUtil.hash(password),
             provider: provider || 'local',
             email: email,
+            role: 'USER',
           },
         },
       },

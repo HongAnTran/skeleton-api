@@ -7,9 +7,9 @@ import { UpdateDepartmentDto } from './dto/update-department.dto';
 export class DepartmentsService {
   constructor(private prisma: PrismaService) {}
 
-  async create(createDepartmentDto: CreateDepartmentDto) {
+  async create(userId: string, createDepartmentDto: CreateDepartmentDto) {
     return this.prisma.department.create({
-      data: createDepartmentDto,
+      data: { ...createDepartmentDto, userId },
     });
   }
 

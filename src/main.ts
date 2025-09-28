@@ -17,7 +17,7 @@ async function bootstrap() {
     const configService = app.get(ConfigService);
     const appConfig = configService.get<AppConfig>('app');
 
-    app.useGlobalFilters(new AllExceptionsFilter());
+    // app.useGlobalFilters(new AllExceptionsFilter());
 
     if (appConfig.helmet.enabled) {
       app.use(

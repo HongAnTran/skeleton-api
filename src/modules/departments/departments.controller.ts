@@ -7,7 +7,6 @@ import {
   Param,
   Delete,
   Query,
-  UseGuards,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -20,9 +19,9 @@ import { DepartmentsService } from './departments.service';
 import { CreateDepartmentDto } from './dto/create-department.dto';
 import { UpdateDepartmentDto } from './dto/update-department.dto';
 import { Department } from './entities/department.entity';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PaginationDto } from '../../common/dtos/pagination.dto';
-
+import { JwtPayload } from 'src/common/decorators/user.decorator';
+import { User } from 'src/common/decorators/user.decorator';
 @ApiTags('Departments')
 @ApiBearerAuth()
 @Controller('departments')
@@ -32,8 +31,11 @@ export class DepartmentsController {
   @Post()
   @ApiOperation({ summary: 'Create a new department' })
   @ApiResponse({ status: 201, type: Department })
-  create(@Body() createDepartmentDto: CreateDepartmentDto) {
-    return this.departmentsService.create(createDepartmentDto);
+  create(
+    @User() user: JwtPayload,
+    @Body() createDepartmentDto: CreateDepartmentDto,
+  ) {
+    return this.departmentsService.create(user.userId, createDepartmentDto);
   }
 
   @Get()
@@ -41,27 +43,20 @@ export class DepartmentsController {
   @ApiResponse({ status: 200, type: [Department] })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
-  @ApiQuery({ name: 'userId', required: false, type: String })
   async findAll(
+    @User() user: JwtPayload,
     @Query() paginationDto: PaginationDto,
-    @Query('userId') userId?: string,
   ) {
     const { page, limit } = paginationDto;
     const skip = (page - 1) * limit;
+    const userId = user.userId;
 
     let departments, total;
 
-    if (userId) {
-      [departments, total] = await Promise.all([
-        this.departmentsService.findByUserId(userId, skip, limit),
-        this.departmentsService.count(userId),
-      ]);
-    } else {
-      [departments, total] = await Promise.all([
-        this.departmentsService.findAll(skip, limit),
-        this.departmentsService.count(),
-      ]);
-    }
+    [departments, total] = await Promise.all([
+      this.departmentsService.findByUserId(userId, skip, limit),
+      this.departmentsService.count(userId),
+    ]);
 
     return {
       data: departments,
@@ -79,13 +74,6 @@ export class DepartmentsController {
   @ApiResponse({ status: 200, type: Department })
   findOne(@Param('id') id: string) {
     return this.departmentsService.findOne(id);
-  }
-
-  @Get('user/:userId')
-  @ApiOperation({ summary: 'Get departments by user ID' })
-  @ApiResponse({ status: 200, type: [Department] })
-  findByUserId(@Param('userId') userId: string) {
-    return this.departmentsService.findByUserId(userId);
   }
 
   @Patch(':id')

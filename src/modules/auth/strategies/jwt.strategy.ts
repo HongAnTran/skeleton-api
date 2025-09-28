@@ -2,16 +2,7 @@ import { ExtractJwt, Strategy } from 'passport-jwt';
 import { PassportStrategy } from '@nestjs/passport';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { UserRole } from '@prisma/client';
-
-export interface JwtPayload {
-  sub: string; // accountId
-  email: string;
-  role?: UserRole; // Only for users
-  type: 'user' | 'employee';
-  userId?: string; // Only for users
-  employeeId?: string; // Only for employees
-}
+import { JwtPayload } from 'src/common/decorators/user.decorator';
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -28,7 +19,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       accountId: payload.sub,
       email: payload.email,
       role: payload.role,
-      type: payload.type,
       userId: payload.userId,
       employeeId: payload.employeeId,
     };
