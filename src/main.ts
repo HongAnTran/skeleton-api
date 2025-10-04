@@ -6,7 +6,7 @@ import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { PrismaService } from './database/prisma.service';
 import { createSwaggerConfig } from './config/swagger.config';
-import { AllExceptionsFilter } from './common/exceptions/all-exceptions.filter';
+// import { AllExceptionsFilter } from './common/exceptions/all-exceptions.filter';
 import { AppConfig } from './config/app.config';
 
 async function bootstrap() {
@@ -17,7 +17,7 @@ async function bootstrap() {
     const configService = app.get(ConfigService);
     const appConfig = configService.get<AppConfig>('app');
 
-    app.useGlobalFilters(new AllExceptionsFilter());
+    // app.useGlobalFilters(new AllExceptionsFilter());
 
     if (appConfig.helmet.enabled) {
       app.use(

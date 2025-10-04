@@ -31,15 +31,15 @@ export class CreateEmployeeDto {
     example: 'john_doe123',
     required: false,
     description:
-      'Username must be 3-20 characters long, contain only letters, numbers, underscores, and hyphens',
+      'Username must be 3-20 characters long, contain only letters, numbers, underscores, hyphens, and dots',
   })
   @IsOptional()
   @IsString()
   @MinLength(3, { message: 'Username must be at least 3 characters long' })
   @MaxLength(20, { message: 'Username must not exceed 20 characters' })
-  @Matches(/^[a-zA-Z0-9_-]+$/, {
+  @Matches(/^[a-zA-Z0-9_.-]+$/, {
     message:
-      'Username can only contain letters, numbers, underscores, and hyphens',
+      'Username can only contain letters, numbers, underscores, hyphens, and dots',
   })
   username: string;
 

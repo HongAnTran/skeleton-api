@@ -28,7 +28,7 @@ import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import { validate } from './config/config.validation';
 
-import { AllExceptionsFilter } from './common/exceptions/all-exceptions.filter';
+// import { AllExceptionsFilter } from './common/exceptions/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { NoCacheInterceptor } from './common/interceptors/no-cache.interceptor';
 import { CronModule } from './common/cron/cron.module';
@@ -77,10 +77,10 @@ import { CronModule } from './common/cron/cron.module';
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
-    {
-      provide: APP_FILTER,
-      useClass: AllExceptionsFilter,
-    },
+    // {
+    //   provide: APP_FILTER,
+    //   useClass: AllExceptionsFilter,
+    // },
     {
       provide: APP_INTERCEPTOR,
       useClass: NoCacheInterceptor,
