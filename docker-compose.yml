@@ -1,8 +1,8 @@
 version: '3.7'
 services:
-  postgres:
+  hitaothom_db:
     image: postgres:13
-    container_name: hitaothom_db
+    container_name: hitaothom_db_container
     ports:
       - '5433:5433'
     environment:
@@ -10,8 +10,8 @@ services:
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
     volumes:
-      - hitaothom_db_data:/var/lib/postgresql/data
+      - hitaothom_db_2_data:/var/lib/postgresql/data
     command: -p 5433
     restart: always
 volumes:
-  hitaothom_db_data:
+  hitaothom_db_2_data:
