@@ -2,15 +2,15 @@ version: '3.7'
 services:
   postgres:
     image: postgres:13
-    container_name: skeleton_db
+    container_name: hitaothom_db
     ports:
-      - '5432:5432'
+      - '5433:5433'
     environment:
       POSTGRES_DB: ${DATABASE_DB}
       POSTGRES_USER: ${DATABASE_USER}
       POSTGRES_PASSWORD: ${DATABASE_PASSWORD}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - hitaothom_db_data:/var/lib/postgresql/data
     restart: always
 volumes:
-  postgres_data:
+  hitaothom_db_data:
