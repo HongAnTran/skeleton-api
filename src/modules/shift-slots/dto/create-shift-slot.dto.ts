@@ -12,6 +12,10 @@ export class CreateShiftSlotDto {
   @IsString()
   branchId: string;
 
+  @ApiProperty()
+  @IsString()
+  departmentId: string;
+
   @ApiProperty({ example: 5, minimum: 1 })
   @IsInt()
   @Min(1)

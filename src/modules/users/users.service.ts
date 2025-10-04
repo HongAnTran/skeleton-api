@@ -9,7 +9,7 @@ export class UsersService {
   constructor(private prisma: PrismaService) {}
 
   async create(createUserDto: CreateUserDto) {
-    const { password, provider, email, ...userData } = createUserDto;
+    const { password, provider, email, username, ...userData } = createUserDto;
     return this.prisma.user.create({
       data: {
         name: userData.name,
@@ -19,6 +19,7 @@ export class UsersService {
             passwordHash: await PasswordUtil.hash(password),
             provider: provider || 'local',
             email: email,
+            username: username,
             role: 'USER',
           },
         },

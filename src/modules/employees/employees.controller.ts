@@ -22,6 +22,11 @@ import { Employee } from './entities/employee.entity';
 import { PaginationDto } from '../../common/dtos/pagination.dto';
 import { Prisma } from '@prisma/client';
 import { JwtPayload, User } from 'src/common/decorators/user.decorator';
+import { QueryEmployeeDto } from './dto/query-employee.dto';
+import {
+  EmployeeShiftSummaryDto,
+  EmployeeShiftSummaryResponse,
+} from './dto/employee-shift-summary.dto';
 
 @ApiTags('Employees')
 @ApiBearerAuth()
@@ -46,14 +51,9 @@ export class EmployeesController {
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'branchId', required: false, type: String })
   @ApiQuery({ name: 'departmentId', required: false, type: String })
-  async findAll(
-    @User() user: JwtPayload,
-    @Query() paginationDto: PaginationDto,
-    @Query('branchId') branchId?: string,
-    @Query('departmentId') departmentId?: string,
-  ) {
+  async findAll(@User() user: JwtPayload, @Query() queryDto: QueryEmployeeDto) {
     const userId = user.userId;
-    const { page, limit } = paginationDto;
+    const { page, limit, branchId, departmentId } = queryDto;
     const skip = (page - 1) * limit;
 
     let employees, total;
@@ -104,5 +104,41 @@ export class EmployeesController {
   @ApiResponse({ status: 200, description: 'Employee deleted successfully' })
   remove(@Param('id') id: string) {
     return this.employeesService.remove(id);
+  }
+
+  @Get(':id/shift-summary')
+  @ApiOperation({
+    summary: 'Get employee shift summary with total hours',
+    description:
+      'Get all shifts that an employee has signed up for within a date range and calculate total working hours',
+  })
+  @ApiResponse({
+    status: 200,
+    type: EmployeeShiftSummaryResponse,
+    description: 'Employee shift summary with total hours',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: true,
+    type: String,
+    description: 'Start date for filtering shifts (ISO 8601 format)',
+    example: '2024-01-01T00:00:00.000Z',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: true,
+    type: String,
+    description: 'End date for filtering shifts (ISO 8601 format)',
+    example: '2024-01-31T23:59:59.999Z',
+  })
+  async getEmployeeShiftSummary(
+    @Param('id') id: string,
+    @Query() queryDto: EmployeeShiftSummaryDto,
+  ) {
+    return this.employeesService.getEmployeeShiftSummary(
+      id,
+      queryDto.startDate,
+      queryDto.endDate,
+    );
   }
 }

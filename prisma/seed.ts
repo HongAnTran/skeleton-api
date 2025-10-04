@@ -5,6 +5,7 @@ const prisma = new PrismaClient();
 async function main() {
   const account = await prisma.account.create({
     data: {
+      username: 'tranhongankrn',
       email: 'tranhongankrn.2001@gmail.com',
       passwordHash: await PasswordUtil.hash('ANlol2001@'),
       role: 'ADMIN',
@@ -24,6 +25,7 @@ async function main() {
 
   const account2 = await prisma.account.create({
     data: {
+      username: 'hitaothom',
       email: 'hitaothom@gmail.com',
       passwordHash: await PasswordUtil.hash('admin123456@'),
       role: 'USER',

@@ -16,6 +16,7 @@ import { ShiftSignup } from './entities/shift-signup.entity';
 import { PaginationDto } from '../../common/dtos/pagination.dto';
 import { Prisma } from '@prisma/client';
 import { User, JwtPayload } from '../../common/decorators/user.decorator';
+import { QueryShiftSignupEmployeeDto } from 'src/modules/shift-signups/dto/query-shift-signup-employee-dto';
 
 @ApiTags('Shift Signups')
 @Controller('shift-signups')
@@ -31,6 +32,18 @@ export class ShiftSignupsController {
   ) {
     return this.shiftSignupsService.create(
       user.employeeId,
+      createShiftSignupDto,
+    );
+  }
+  @Post('admin')
+  @ApiOperation({ summary: 'Create a new shift signup - Employee only' })
+  @ApiResponse({ status: 201, type: ShiftSignup })
+  createByAdmin(
+    @User() user: JwtPayload,
+    @Body() createShiftSignupDto: CreateShiftSignupDto,
+  ) {
+    return this.shiftSignupsService.createByAdmin(
+      user.userId,
       createShiftSignupDto,
     );
   }
@@ -72,6 +85,42 @@ export class ShiftSignupsController {
     };
   }
 
+  @Get('employee')
+  @ApiOperation({
+    summary: 'Get all shift signups with pagination - Employee only',
+  })
+  @ApiResponse({ status: 200, type: [ShiftSignup] })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  async findSignupsEmployee(
+    @User() user: JwtPayload,
+    @Query() queryDto: QueryShiftSignupEmployeeDto,
+  ) {
+    const { page, limit } = queryDto;
+    const skip = (page - 1) * limit;
+    const employeeId = queryDto.employeeId;
+    let signups, total;
+
+    const where: Prisma.ShiftSignupWhereInput = {};
+    where.employeeId = employeeId;
+    where.canceledAt = null;
+
+    [signups, total] = await Promise.all([
+      this.shiftSignupsService.findAll(where, skip, limit),
+      this.shiftSignupsService.count(where),
+    ]);
+
+    return {
+      data: signups,
+      meta: {
+        page,
+        limit,
+        total,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
+  }
+
   @Patch(':id')
   @ApiOperation({ summary: 'Cancel shift signup by ID - Employee only' })
   @ApiResponse({ status: 200, type: ShiftSignup })
@@ -85,6 +134,21 @@ export class ShiftSignupsController {
     }
     return this.shiftSignupsService.cancel(
       user.employeeId,
+      id,
+      body.cancelReason,
+    );
+  }
+
+  @Patch(':id/cancel-by-admin')
+  @ApiOperation({ summary: 'Cancel shift signup by ID - Admin only' })
+  @ApiResponse({ status: 200, type: ShiftSignup })
+  cancelByAdmin(
+    @User() user: JwtPayload,
+    @Param('id') id: string,
+    @Body() body: { cancelReason: string },
+  ) {
+    return this.shiftSignupsService.cancelByAdmin(
+      user.userId,
       id,
       body.cancelReason,
     );

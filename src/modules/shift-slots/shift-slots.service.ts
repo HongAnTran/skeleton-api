@@ -6,18 +6,20 @@ import {
 import { PrismaService } from '../../database/prisma.service';
 import { CreateShiftSlotDto } from './dto/create-shift-slot.dto';
 import { UpdateShiftSlotDto } from './dto/update-shift-slot.dto';
-import { Prisma } from '@prisma/client';
+import { Prisma, ShiftSignupStatus } from '@prisma/client';
 
 @Injectable()
 export class ShiftSlotsService {
   constructor(private prisma: PrismaService) {}
 
   async create(userId: string, createShiftSlotDto: CreateShiftSlotDto) {
-    const { typeId, branchId, capacity, date, note } = createShiftSlotDto;
+    const { typeId, branchId, departmentId, capacity, date, note } =
+      createShiftSlotDto;
     const existingSlot = await this.prisma.shiftSlot.findFirst({
       where: {
         date: new Date(date),
         branchId,
+        departmentId,
         typeId,
       },
     });
@@ -39,6 +41,11 @@ export class ShiftSlotsService {
             id: branchId,
           },
         },
+        department: {
+          connect: {
+            id: departmentId,
+          },
+        },
         date: new Date(date),
         note,
         type: {
@@ -51,7 +58,7 @@ export class ShiftSlotsService {
   }
 
   async createMany(userId: string, createShiftSlotDto: CreateShiftSlotDto) {
-    const { date, endDate, branchId, typeId, capacity, note } =
+    const { date, endDate, branchId, departmentId, typeId, capacity, note } =
       createShiftSlotDto;
     if (endDate) {
       const startDate = new Date(date);
@@ -69,6 +76,7 @@ export class ShiftSlotsService {
             lte: endDateValue,
           },
           branchId,
+          departmentId,
           typeId,
         },
       });
@@ -91,6 +99,7 @@ export class ShiftSlotsService {
         capacity,
         userId,
         branchId,
+        departmentId,
         typeId,
         note,
       }));
@@ -119,10 +128,16 @@ export class ShiftSlotsService {
             name: true,
           },
         },
+        department: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         signups: {
           select: {
             id: true,
-            isCanceled: true,
+            status: true,
             canceledAt: true,
             cancelReason: true,
             employee: {
@@ -153,9 +168,6 @@ export class ShiftSlotsService {
     const whereNew = { ...where };
     const employee = await this.prisma.employee.findUnique({
       where: { id: employeeId },
-      include: {
-        branch: true,
-      },
     });
 
     if (!employee) {
@@ -165,12 +177,28 @@ export class ShiftSlotsService {
     whereNew.branchId = employee.branchId;
     whereNew.userId = userId;
 
+    if (!where.departmentId) {
+      whereNew.departmentId = employee.departmentId;
+    }
+
     return this.prisma.shiftSlot.findMany({
       where: whereNew,
       include: {
+        branch: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        department: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         signups: {
           where: {
-            isCanceled: false,
+            status: ShiftSignupStatus.PENDING,
           },
           select: {
             id: true,
@@ -199,6 +227,12 @@ export class ShiftSlotsService {
       where: { id },
       include: {
         branch: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        department: {
           select: {
             id: true,
             name: true,

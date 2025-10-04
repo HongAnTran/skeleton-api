@@ -21,10 +21,13 @@ export class UserAuthService {
   ) {}
 
   async login(loginDto: LoginDto): Promise<AuthResponseDto> {
-    const { email, password } = loginDto;
+    const { emailOrUsername, password } = loginDto;
 
-    const account = await this.prisma.account.findUnique({
-      where: { email },
+    // Tìm account bằng email hoặc username
+    const account = await this.prisma.account.findFirst({
+      where: {
+        OR: [{ email: emailOrUsername }, { username: emailOrUsername }],
+      },
       include: { user: true },
     });
 
@@ -124,7 +127,7 @@ export class UserAuthService {
     const [access_token, refresh_token] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>('JWT_SECRET'),
-        expiresIn: '1h',
+        expiresIn: '7d',
       }),
       this.jwtService.signAsync(payload, {
         secret: this.configService.get<string>(
@@ -133,12 +136,12 @@ export class UserAuthService {
         ),
         expiresIn: this.configService.get<string>(
           'JWT_REFRESH_EXPIRES_IN',
-          '7d',
+          '30d',
         ),
       }),
     ]);
 
-    const expiresIn = this.parseExpirationTime('1h');
+    const expiresIn = this.parseExpirationTime('7d');
 
     return {
       access_token,

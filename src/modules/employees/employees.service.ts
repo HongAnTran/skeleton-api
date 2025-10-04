@@ -4,19 +4,23 @@ import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { PasswordUtil } from 'src/common/utils/password.util';
 import { Prisma } from '@prisma/client';
+import { EmployeeShiftSummaryResponse } from './dto/employee-shift-summary.dto';
 
 @Injectable()
 export class EmployeesService {
   constructor(private prisma: PrismaService) {}
 
   async create(userId: string, createEmployeeDto: CreateEmployeeDto) {
-    const { password, provider, email, ...employeeData } = createEmployeeDto;
+    const { password, provider, email, username, ...employeeData } =
+      createEmployeeDto;
+
     return this.prisma.employee.create({
       data: {
         userId,
         ...employeeData,
         account: {
           create: {
+            username: username,
             email: email,
             passwordHash: await PasswordUtil.hash(password),
             provider: provider || 'local',
@@ -158,5 +162,101 @@ export class EmployeesService {
     return this.prisma.employee.count({
       where,
     });
+  }
+
+  async getEmployeeShiftSummary(
+    employeeId: string,
+    startDate: string,
+    endDate: string,
+  ) {
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      include: {
+        branch: true,
+        department: true,
+        account: {
+          select: {
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!employee) {
+      throw new NotFoundException(`Employee with ID ${employeeId} not found`);
+    }
+
+    const shiftSignups = await this.prisma.shiftSignup.findMany({
+      where: {
+        employeeId,
+        slot: {
+          date: {
+            gte: new Date(startDate),
+            lte: new Date(endDate),
+          },
+        },
+      },
+      include: {
+        slot: {
+          include: {
+            branch: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            department: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            type: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+      orderBy: {
+        slot: {
+          date: 'asc',
+        },
+      },
+    });
+
+    const totalHours = shiftSignups.reduce(
+      (sum, signup) => sum + signup.totalHours,
+      0,
+    );
+    const shiftCount = shiftSignups.length;
+
+    const shifts = shiftSignups.map((signup) => ({
+      id: signup.id,
+      employeeId: signup.employeeId,
+      slotId: signup.slotId,
+      status: signup.status,
+      totalHours: signup.totalHours,
+      createdAt: signup.createdAt,
+      updatedAt: signup.updatedAt,
+      slot: {
+        id: signup.slot.id,
+        date: signup.slot.date,
+        capacity: signup.slot.capacity,
+        note: signup.slot.note,
+        branch: signup.slot.branch,
+        department: signup.slot.department,
+        type: signup.slot.type,
+      },
+    }));
+
+    return {
+      employee: employee,
+      totalHours,
+      shiftCount,
+      shifts,
+    };
   }
 }

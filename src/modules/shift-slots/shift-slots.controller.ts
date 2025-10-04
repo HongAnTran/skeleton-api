@@ -57,8 +57,16 @@ export class ShiftSlotsController {
     @User() user: JwtPayload,
     @Query() queryDto: QueryShiftSlotDto,
   ) {
-    const { page, limit, branchId, typeId, startDate, endDate, skip } =
-      queryDto;
+    const {
+      page,
+      limit,
+      branchId,
+      departmentId,
+      typeId,
+      startDate,
+      endDate,
+      skip,
+    } = queryDto;
     const userId = user.userId;
     let shiftSlots, total;
 
@@ -68,6 +76,9 @@ export class ShiftSlotsController {
 
     if (branchId) {
       where.branchId = branchId;
+    }
+    if (departmentId) {
+      where.departmentId = departmentId;
     }
     if (typeId) {
       where.typeId = typeId;
@@ -101,15 +112,19 @@ export class ShiftSlotsController {
     @User() user: JwtPayload,
     @Query() queryDto: QueryShiftSlotEmployeeDto,
   ) {
-    const { typeId, startDate, endDate } = queryDto;
+    const { typeId, startDate, endDate, departmentId } = queryDto;
     const userId = user.userId;
     const employeeId = user.employeeId;
     return this.shiftSlotsService.findAllByEmployee(employeeId, userId, {
       typeId,
-      date: {
-        gte: new Date(startDate),
-        lte: new Date(endDate),
-      },
+      departmentId,
+      date:
+        startDate && endDate
+          ? {
+              gte: new Date(startDate),
+              lte: new Date(endDate),
+            }
+          : undefined,
     });
   }
 

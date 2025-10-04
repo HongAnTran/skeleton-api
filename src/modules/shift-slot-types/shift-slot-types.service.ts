@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateShiftSlotTypeDto } from './dto/create-shift-slot-type.dto';
 import { UpdateShiftSlotTypeDto } from './dto/update-shift-slot-type.dto';
@@ -85,10 +89,37 @@ export class ShiftSlotTypesService {
 
   async remove(id: string) {
     try {
+      const shiftSlotType = await this.prisma.shiftSlotType.findUnique({
+        where: { id },
+        include: {
+          shiftSlots: {
+            include: {
+              signups: true,
+            },
+          },
+        },
+      });
+      if (!shiftSlotType) {
+        throw new NotFoundException(`ShiftSlotType with ID ${id} not found`);
+      }
+
+      if (shiftSlotType.shiftSlots.some((slot) => slot.signups.length > 0)) {
+        throw new BadRequestException(
+          'Không thể xóa kiểu ca làm việc đã có đăng ký',
+        );
+      }
+
+      await this.prisma.shiftSlot.deleteMany({
+        where: {
+          typeId: id,
+        },
+      });
+
       return await this.prisma.shiftSlotType.delete({
         where: { id },
       });
     } catch (error) {
+      console.log(error);
       throw new NotFoundException(`ShiftSlotType with ID ${id} not found`);
     }
   }

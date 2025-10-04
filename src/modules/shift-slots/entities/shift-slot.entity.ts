@@ -11,6 +11,9 @@ export class ShiftSlot {
   branchId: string;
 
   @ApiProperty()
+  departmentId: string;
+
+  @ApiProperty()
   startDate: Date;
 
   @ApiProperty()
@@ -34,6 +37,9 @@ export class ShiftSlot {
 
   @ApiProperty({ required: false })
   branch?: any;
+
+  @ApiProperty({ required: false })
+  department?: any;
 
   @ApiProperty({ required: false, type: [Object] })
   signups?: any[];

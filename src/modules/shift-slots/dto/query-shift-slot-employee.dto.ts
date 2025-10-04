@@ -1,4 +1,4 @@
-import { IsOptional, IsString, IsDateString } from 'class-validator';
+import { IsOptional, IsString, IsDateString, IsBoolean } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginationDto } from '../../../common/dtos/pagination.dto';
 
@@ -9,6 +9,13 @@ export class QueryShiftSlotEmployeeDto {
   @IsOptional()
   @IsString()
   typeId?: string;
+
+  @ApiPropertyOptional({
+    description: 'Department ID to filter by',
+  })
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
 
   @ApiPropertyOptional({
     description: 'Start date for filtering (ISO string)',
@@ -25,4 +32,12 @@ export class QueryShiftSlotEmployeeDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'Is canceled for filtering',
+    example: true,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isCanceled?: boolean;
 }

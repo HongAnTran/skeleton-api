@@ -5,4 +5,9 @@ export class CreateShiftSignupDto {
   @ApiProperty()
   @IsString()
   slotId: string;
+
+  @ApiProperty()
+  @IsOptional()
+  @IsString()
+  employeeId?: string;
 }

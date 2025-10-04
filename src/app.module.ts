@@ -2,6 +2,7 @@ import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { Module, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { ScheduleModule } from '@nestjs/schedule';
 
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -18,7 +19,9 @@ import { DepartmentsModule } from './modules/departments/departments.module';
 import { ShiftSlotsModule } from './modules/shift-slots/shift-slots.module';
 import { ShiftSlotTypesModule } from './modules/shift-slot-types/shift-slot-types.module';
 import { ShiftSignupsModule } from './modules/shift-signups/shift-signups.module';
+import { ShiftSwapsModule } from './modules/shift-swaps/shift-swaps.module';
 import { TasksModule } from './modules/tasks/tasks.module';
+import { ReportsModule } from './modules/reports/reports.module';
 
 import configuration from './config/configuration';
 import appConfig from './config/app.config';
@@ -28,6 +31,7 @@ import { validate } from './config/config.validation';
 import { AllExceptionsFilter } from './common/exceptions/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { NoCacheInterceptor } from './common/interceptors/no-cache.interceptor';
+import { CronModule } from './common/cron/cron.module';
 
 @Module({
   imports: [
@@ -45,6 +49,7 @@ import { NoCacheInterceptor } from './common/interceptors/no-cache.interceptor';
         limit: parseInt(process.env.THROTTLE_LIMIT, 10) || 10,
       },
     ]),
+    ScheduleModule.forRoot(),
     DatabaseModule,
     HealthModule,
     // Feature Modules
@@ -56,7 +61,10 @@ import { NoCacheInterceptor } from './common/interceptors/no-cache.interceptor';
     ShiftSlotsModule,
     ShiftSlotTypesModule,
     ShiftSignupsModule,
+    ShiftSwapsModule,
     TasksModule,
+    ReportsModule,
+    CronModule,
   ],
   controllers: [AppController],
   providers: [
@@ -69,10 +77,10 @@ import { NoCacheInterceptor } from './common/interceptors/no-cache.interceptor';
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
-    // {
-    //   provide: APP_FILTER,
-    //   useClass: AllExceptionsFilter,
-    // },
+    {
+      provide: APP_FILTER,
+      useClass: AllExceptionsFilter,
+    },
     {
       provide: APP_INTERCEPTOR,
       useClass: NoCacheInterceptor,

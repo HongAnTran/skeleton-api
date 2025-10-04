@@ -16,11 +16,25 @@ enum TaskStatus {
   DONE   
 }
 
+enum ShiftSwapStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  CANCELLED
+  COMPLETED
+}
+
 
 enum AccountRole {
   ADMIN
   USER
   EMPLOYEE
+}
+
+enum ShiftSignupStatus {
+  PENDING
+  COMPLETED
+  CANCELLED
 }
 
 
@@ -39,6 +53,7 @@ model User {
 }
 model Account {
   id                  String   @id @default(cuid()) 
+  username            String  @unique
   email               String     @unique
   userId              String?   @unique
   employeeId          String?   @unique
@@ -52,7 +67,6 @@ model Account {
   updatedAt    DateTime   @updatedAt
   @@index([userId])
   @@index([employeeId])
-
   @@unique([userId, employeeId])
 }
 
@@ -73,7 +87,10 @@ model Employee {
   shiftSignups  ShiftSignup[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
-  tasks Task[] 
+  tasks Task[]
+  // Shift swap relations
+  swapRequestsSent ShiftSwapRequest[] @relation("ShiftSwapRequester")
+  swapRequestsReceived ShiftSwapRequest[] @relation("ShiftSwapTarget") 
 }
 
 model Branch {
@@ -97,6 +114,7 @@ model Department {
   updatedAt    DateTime   @updatedAt
   createdAt    DateTime   @default(now())
   employees  Employee[]
+  shiftSlots ShiftSlot[]
 }
 
 
@@ -111,9 +129,14 @@ model ShiftSlot {
   updatedAt    DateTime   @updatedAt
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   branch    Branch    @relation(fields: [branchId], references: [id], onDelete: Cascade)
+  departmentId String
+  department Department @relation(fields: [departmentId], references: [id])
   signups   ShiftSignup[]
   type      ShiftSlotType @relation(fields: [typeId], references: [id])
   typeId    String
+  // Shift swap relations
+  requesterSwapRequests ShiftSwapRequest[] @relation("RequesterSlot")
+  targetSwapRequests    ShiftSwapRequest[] @relation("TargetSlot")
 }
 
 model ShiftSlotType {
@@ -124,6 +147,7 @@ model ShiftSlotType {
   endDate   DateTime
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   shiftSlots ShiftSlot[]
+  
   updatedAt    DateTime   @updatedAt
   createdAt    DateTime   @default(now())
 }
@@ -133,9 +157,11 @@ model ShiftSignup {
   employeeId  String
   createdAt   DateTime   @default(now())
   slotId      String
-  isCanceled  Boolean    @default(false)
+  status      ShiftSignupStatus @default(PENDING)
   canceledAt  DateTime?
   cancelReason String?
+  canceledBy String?
+  totalHours Float
   employee    Employee   @relation(fields: [employeeId], references: [id], onDelete: Cascade)
   slot        ShiftSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
   updatedAt   DateTime   @updatedAt
@@ -150,4 +176,28 @@ model Task {
   updatedAt   DateTime   @updatedAt
   level       Int       @default(1)  
   employee  Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+}
+
+model ShiftSwapRequest {
+  id              String          @id @default(cuid())
+  requesterId     String
+  targetId        String
+  requesterSlotId String
+  targetSlotId    String
+  status          ShiftSwapStatus @default(PENDING)
+  reason          String?
+  message         String?
+  createdAt       DateTime        @default(now())
+  updatedAt       DateTime        @updatedAt
+  respondedAt     DateTime?
+  
+  // Relations
+  requester       Employee        @relation("ShiftSwapRequester", fields: [requesterId], references: [id], onDelete: Cascade)
+  target          Employee        @relation("ShiftSwapTarget", fields: [targetId], references: [id], onDelete: Cascade)
+  requesterSlot   ShiftSlot       @relation("RequesterSlot", fields: [requesterSlotId], references: [id], onDelete: Cascade)
+  targetSlot      ShiftSlot       @relation("TargetSlot", fields: [targetSlotId], references: [id], onDelete: Cascade)
+  
+  @@index([requesterId])
+  @@index([targetId])
+  @@index([status])
 }

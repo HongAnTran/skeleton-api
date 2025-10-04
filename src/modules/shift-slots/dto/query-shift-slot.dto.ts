@@ -11,6 +11,13 @@ export class QueryShiftSlotDto extends PaginationDto {
   branchId?: string;
 
   @ApiPropertyOptional({
+    description: 'Department ID to filter by',
+  })
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
+  @ApiPropertyOptional({
     description: 'Shift slot type ID to filter by',
   })
   @IsOptional()
