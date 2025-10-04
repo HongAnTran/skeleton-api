@@ -4,7 +4,7 @@ services:
     image: postgres:13
     container_name: hitaothom_db
     ports:
-      - '5433:5433'
+      - '5433:5432'
     environment:
       POSTGRES_DB: ${DATABASE_DB}
       POSTGRES_USER: ${DATABASE_USER}
