@@ -221,9 +221,6 @@ export class EmployeesService {
     const shiftSignups = await this.prisma.shiftSignup.findMany({
       where: {
         employeeId,
-        status: {
-          not: ShiftSignupStatus.CANCELLED,
-        },
         slot: {
           date: {
             gte: new Date(startDate),
@@ -262,11 +259,24 @@ export class EmployeesService {
       },
     });
 
-    const totalHours = shiftSignups.reduce(
+    const ShiftSignupsCancelled = shiftSignups.filter(
+      (signup) => signup.status === ShiftSignupStatus.CANCELLED,
+    );
+    const ShiftSignupsCompleted = shiftSignups.filter(
+      (signup) => signup.status === ShiftSignupStatus.COMPLETED,
+    );
+
+    const ShiftSignupsPending = shiftSignups.filter(
+      (signup) => signup.status === ShiftSignupStatus.PENDING,
+    );
+
+    const totalHoursCompleted = ShiftSignupsCompleted.reduce(
       (sum, signup) => sum + signup.totalHours,
       0,
     );
-    const shiftCount = shiftSignups.length;
+    const shiftCountCompleted = ShiftSignupsCompleted.length;
+    const shiftCountCancelled = ShiftSignupsCancelled.length;
+    const shiftCountPending = ShiftSignupsPending.length;
 
     const shifts = shiftSignups.map((signup) => ({
       id: signup.id,
@@ -289,8 +299,10 @@ export class EmployeesService {
 
     return {
       employee: employee,
-      totalHours,
-      shiftCount,
+      shiftCountPending,
+      totalHoursCompleted,
+      shiftCountCompleted,
+      shiftCountCancelled,
       shifts,
     };
   }
