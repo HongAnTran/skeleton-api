@@ -493,7 +493,6 @@ export class ReportsService {
         include: {
           employee: {
             include: {
-              user: { select: { name: true } },
               branch: { select: { name: true } },
               department: { select: { name: true } },
             },
@@ -594,7 +593,7 @@ export class ReportsService {
       if (!employeeMap.has(employeeId)) {
         employeeMap.set(employeeId, {
           employeeId: signup.employee.id,
-          employeeName: signup.employee.user.name,
+          employeeName: signup.employee.name,
           branchName: signup.employee.branch.name,
           departmentName: signup.employee.department.name,
           totalShifts: 0,
