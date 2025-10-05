@@ -3,7 +3,7 @@ import { IsOptional, IsBoolean, IsString } from 'class-validator';
 
 export class CronConfigDto {
   @ApiProperty({
-    description: 'Enable automatic shift signup status updates',
+    description: 'Bật cập nhật trạng thái đăng ký ca tự động',
     default: true,
   })
   @IsOptional()
@@ -11,7 +11,7 @@ export class CronConfigDto {
   enableShiftSignupUpdates?: boolean = true;
 
   @ApiProperty({
-    description: 'Enable cleanup of old completed shift signups',
+    description: 'Bật dọn dẹp các đăng ký ca đã hoàn thành cũ',
     default: true,
   })
   @IsOptional()
@@ -19,7 +19,7 @@ export class CronConfigDto {
   enableCleanup?: boolean = true;
 
   @ApiProperty({
-    description: 'Enable upcoming shifts notifications',
+    description: 'Bật thông báo ca sắp tới',
     default: true,
   })
   @IsOptional()
@@ -27,7 +27,7 @@ export class CronConfigDto {
   enableUpcomingNotifications?: boolean = true;
 
   @ApiProperty({
-    description: 'Days to keep completed shift signups before cleanup',
+    description: 'Số ngày giữ các đăng ký ca đã hoàn thành trước khi dọn dẹp',
     default: 90,
   })
   @IsOptional()
@@ -35,7 +35,7 @@ export class CronConfigDto {
   cleanupDays?: string = '90';
 
   @ApiProperty({
-    description: 'Cron expression for shift signup updates',
+    description: 'Biểu thức cron cho cập nhật đăng ký ca',
     default: '0 2 * * *', // Every day at 2 AM
   })
   @IsOptional()
@@ -43,7 +43,7 @@ export class CronConfigDto {
   updateCronExpression?: string = '0 2 * * *';
 
   @ApiProperty({
-    description: 'Cron expression for cleanup',
+    description: 'Biểu thức cron cho dọn dẹp',
     default: '0 3 * * *', // Every day at 3 AM
   })
   @IsOptional()
@@ -51,7 +51,7 @@ export class CronConfigDto {
   cleanupCronExpression?: string = '0 3 * * *';
 
   @ApiProperty({
-    description: 'Cron expression for upcoming shifts check',
+    description: 'Biểu thức cron cho kiểm tra ca sắp tới',
     default: '0 * * * *', // Every hour
   })
   @IsOptional()

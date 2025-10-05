@@ -4,7 +4,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class PaginationDto {
   @ApiPropertyOptional({
-    description: 'Page number (1-based)',
+    description: 'Số trang (bắt đầu từ 1)',
     default: 1,
     minimum: 1,
   })
@@ -15,7 +15,7 @@ export class PaginationDto {
   page?: number = 1;
 
   @ApiPropertyOptional({
-    description: 'Number of items per page',
+    description: 'Số lượng mục trên mỗi trang',
     default: 10,
     minimum: 1,
     maximum: 1000,

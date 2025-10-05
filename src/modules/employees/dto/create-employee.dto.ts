@@ -31,15 +31,15 @@ export class CreateEmployeeDto {
     example: 'john_doe123',
     required: false,
     description:
-      'Username must be 3-20 characters long, contain only letters, numbers, and basic special characters',
+      'Tên người dùng phải có từ 3-20 ký tự, chỉ chứa chữ cái, số và các ký tự đặc biệt cơ bản',
   })
   @IsOptional()
   @IsString()
-  @MinLength(3, { message: 'Username must be at least 3 characters long' })
-  @MaxLength(20, { message: 'Username must not exceed 20 characters' })
+  @MinLength(3, { message: 'Tên người dùng phải có ít nhất 3 ký tự' })
+  @MaxLength(20, { message: 'Tên người dùng không được vượt quá 20 ký tự' })
   @Matches(/^[a-zA-Z0-9_.\-@#$%&*+=?!~^|\\/<>\[\]{}()]+$/, {
     message:
-      'Username can only contain letters, numbers, and basic special characters',
+      'Tên người dùng chỉ có thể chứa chữ cái, số và các ký tự đặc biệt cơ bản',
   })
   username: string;
 

@@ -4,14 +4,14 @@ import { Employee } from '../entities/employee.entity';
 
 export class EmployeeShiftSummaryDto {
   @ApiProperty({
-    description: 'Start date for filtering shifts (ISO 8601 format)',
+    description: 'Ngày bắt đầu để lọc ca làm việc (định dạng ISO 8601)',
     example: '2024-01-01T00:00:00.000Z',
   })
   @IsDateString()
   startDate: string;
 
   @ApiProperty({
-    description: 'End date for filtering shifts (ISO 8601 format)',
+    description: 'Ngày kết thúc để lọc ca làm việc (định dạng ISO 8601)',
     example: '2024-01-31T23:59:59.999Z',
   })
   @IsDateString()

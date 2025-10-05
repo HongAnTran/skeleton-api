@@ -4,21 +4,21 @@ import { PaginationDto } from '../../../common/dtos/pagination.dto';
 
 export class QueryShiftSlotEmployeeDto {
   @ApiPropertyOptional({
-    description: 'Shift slot type ID to filter by',
+    description: 'ID loại ca làm việc để lọc',
   })
   @IsOptional()
   @IsString()
   typeId?: string;
 
   @ApiPropertyOptional({
-    description: 'Department ID to filter by',
+    description: 'ID phòng ban để lọc',
   })
   @IsOptional()
   @IsString()
   departmentId?: string;
 
   @ApiPropertyOptional({
-    description: 'Start date for filtering (ISO string)',
+    description: 'Ngày bắt đầu để lọc (chuỗi ISO)',
     example: '2025-08-31T17:00:00.000Z',
   })
   @IsOptional()
@@ -26,7 +26,7 @@ export class QueryShiftSlotEmployeeDto {
   startDate?: string;
 
   @ApiPropertyOptional({
-    description: 'End date for filtering (ISO string)',
+    description: 'Ngày kết thúc để lọc (chuỗi ISO)',
     example: '2025-09-30T16:59:59.999Z',
   })
   @IsOptional()
@@ -34,7 +34,7 @@ export class QueryShiftSlotEmployeeDto {
   endDate?: string;
 
   @ApiPropertyOptional({
-    description: 'Is canceled for filtering',
+    description: 'Đã hủy để lọc',
     example: true,
   })
   @IsOptional()
