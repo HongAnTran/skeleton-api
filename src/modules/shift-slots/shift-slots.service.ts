@@ -314,29 +314,23 @@ export class ShiftSlotsService {
   }
 
   async remove(id: string) {
-    try {
-      const shiftSlot = await this.prisma.shiftSlot.findUnique({
-        where: { id },
-        include: {
-          signups: true,
-        },
-      });
-      if (!shiftSlot) {
-        throw new NotFoundException(`Shift slot with ID ${id} not found`);
-      }
-
-      if (shiftSlot.signups.length > 0) {
-        throw new BadRequestException(
-          'Không thể xóa ca làm việc đã có đăng ký',
-        );
-      }
-
-      return await this.prisma.shiftSlot.delete({
-        where: { id },
-      });
-    } catch (error) {
+    const shiftSlot = await this.prisma.shiftSlot.findUnique({
+      where: { id },
+      include: {
+        signups: true,
+      },
+    });
+    if (!shiftSlot) {
       throw new NotFoundException(`Shift slot with ID ${id} not found`);
     }
+
+    if (shiftSlot.signups.length > 0) {
+      throw new BadRequestException('Không thể xóa ca làm việc đã có đăng ký');
+    }
+
+    return await this.prisma.shiftSlot.delete({
+      where: { id },
+    });
   }
 
   async count(where: Prisma.ShiftSlotWhereInput) {
