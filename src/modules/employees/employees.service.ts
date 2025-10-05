@@ -1,4 +1,8 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
@@ -13,6 +17,26 @@ export class EmployeesService {
   async create(userId: string, createEmployeeDto: CreateEmployeeDto) {
     const { password, provider, email, username, ...employeeData } =
       createEmployeeDto;
+
+    const [account, usernameAccount] = await Promise.all([
+      this.prisma.account.findUnique({
+        where: {
+          email: email,
+        },
+      }),
+      this.prisma.account.findUnique({
+        where: {
+          username: username,
+        },
+      }),
+    ]);
+
+    if (account) {
+      throw new BadRequestException('Email đã tồn tại');
+    }
+    if (usernameAccount) {
+      throw new BadRequestException('Username đã tồn tại');
+    }
 
     return this.prisma.employee.create({
       data: {
