@@ -324,8 +324,8 @@ export class ShiftSlotsService {
       throw new NotFoundException(`Shift slot with ID ${id} not found`);
     }
 
-    if (shiftSlot.signups.length > 0) {
-      throw new BadRequestException('Không thể xóa ca làm việc đã có đăng ký');
+    if (shiftSlot.date < new Date()) {
+      throw new BadRequestException('Không thể xóa ca làm việc trong quá khứ');
     }
 
     return await this.prisma.shiftSlot.delete({

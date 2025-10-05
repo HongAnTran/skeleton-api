@@ -91,21 +91,11 @@ export class ShiftSlotTypesService {
     const shiftSlotType = await this.prisma.shiftSlotType.findUnique({
       where: { id },
       include: {
-        shiftSlots: {
-          include: {
-            signups: true,
-          },
-        },
+        shiftSlots: true,
       },
     });
     if (!shiftSlotType) {
       throw new NotFoundException(`ShiftSlotType with ID ${id} not found`);
-    }
-
-    if (shiftSlotType.shiftSlots.some((slot) => slot.signups.length > 0)) {
-      throw new BadRequestException(
-        'Không thể xóa kiểu ca làm việc đã có đăng ký',
-      );
     }
 
     await this.prisma.shiftSlot.deleteMany({
