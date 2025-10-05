@@ -88,40 +88,35 @@ export class ShiftSlotTypesService {
   }
 
   async remove(id: string) {
-    try {
-      const shiftSlotType = await this.prisma.shiftSlotType.findUnique({
-        where: { id },
-        include: {
-          shiftSlots: {
-            include: {
-              signups: true,
-            },
+    const shiftSlotType = await this.prisma.shiftSlotType.findUnique({
+      where: { id },
+      include: {
+        shiftSlots: {
+          include: {
+            signups: true,
           },
         },
-      });
-      if (!shiftSlotType) {
-        throw new NotFoundException(`ShiftSlotType with ID ${id} not found`);
-      }
-
-      if (shiftSlotType.shiftSlots.some((slot) => slot.signups.length > 0)) {
-        throw new BadRequestException(
-          'Không thể xóa kiểu ca làm việc đã có đăng ký',
-        );
-      }
-
-      await this.prisma.shiftSlot.deleteMany({
-        where: {
-          typeId: id,
-        },
-      });
-
-      return await this.prisma.shiftSlotType.delete({
-        where: { id },
-      });
-    } catch (error) {
-      console.log(error);
+      },
+    });
+    if (!shiftSlotType) {
       throw new NotFoundException(`ShiftSlotType with ID ${id} not found`);
     }
+
+    if (shiftSlotType.shiftSlots.some((slot) => slot.signups.length > 0)) {
+      throw new BadRequestException(
+        'Không thể xóa kiểu ca làm việc đã có đăng ký',
+      );
+    }
+
+    await this.prisma.shiftSlot.deleteMany({
+      where: {
+        typeId: id,
+      },
+    });
+
+    return await this.prisma.shiftSlotType.delete({
+      where: { id },
+    });
   }
 
   async count(userId?: string) {
