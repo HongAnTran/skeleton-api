@@ -7,7 +7,7 @@ import { PrismaService } from '../../database/prisma.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { PasswordUtil } from 'src/common/utils/password.util';
-import { Prisma } from '@prisma/client';
+import { Prisma, ShiftSignupStatus } from '@prisma/client';
 import { EmployeeShiftSummaryResponse } from './dto/employee-shift-summary.dto';
 
 @Injectable()
@@ -221,6 +221,9 @@ export class EmployeesService {
     const shiftSignups = await this.prisma.shiftSignup.findMany({
       where: {
         employeeId,
+        status: {
+          not: ShiftSignupStatus.CANCELLED,
+        },
         slot: {
           date: {
             gte: new Date(startDate),
