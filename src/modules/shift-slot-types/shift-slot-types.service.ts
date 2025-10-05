@@ -26,7 +26,7 @@ export class ShiftSlotTypesService {
     return this.prisma.shiftSlotType.findMany({
       skip,
       take,
-      where: { userId },
+      where: { userId, isDeleted: false },
       include: {
         user: true,
         shiftSlots: true,
@@ -36,7 +36,7 @@ export class ShiftSlotTypesService {
 
   async findOne(id: string) {
     const shiftSlotType = await this.prisma.shiftSlotType.findUnique({
-      where: { id },
+      where: { id, isDeleted: false },
       include: {
         user: true,
         shiftSlots: true,
@@ -52,7 +52,7 @@ export class ShiftSlotTypesService {
 
   async findByUserId(userId: string, skip?: number, take?: number) {
     return this.prisma.shiftSlotType.findMany({
-      where: { userId },
+      where: { userId, isDeleted: false },
       skip,
       take,
       include: {
@@ -75,7 +75,7 @@ export class ShiftSlotTypesService {
       };
 
       return await this.prisma.shiftSlotType.update({
-        where: { id },
+        where: { id, isDeleted: false },
         data,
         include: {
           user: true,
@@ -98,15 +98,17 @@ export class ShiftSlotTypesService {
       throw new NotFoundException(`ShiftSlotType with ID ${id} not found`);
     }
 
-    await this.prisma.shiftSlot.deleteMany({
-      where: {
-        typeId: id,
-      },
-    });
+    if (shiftSlotType.isDeleted) {
+      throw new BadRequestException(
+        `ShiftSlotType with ID ${id} is already deleted`,
+      );
+    }
 
-    return await this.prisma.shiftSlotType.delete({
+    await this.prisma.shiftSlotType.update({
       where: { id },
+      data: { isDeleted: true },
     });
+    return shiftSlotType;
   }
 
   async count(userId?: string) {

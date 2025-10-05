@@ -168,6 +168,7 @@ export class ShiftSlotsService {
             startDate: true,
             endDate: true,
             id: true,
+            isDeleted: true,
           },
         },
       },
@@ -226,10 +227,11 @@ export class ShiftSlotsService {
         },
         type: {
           select: {
+            id: true,
             name: true,
             startDate: true,
             endDate: true,
-            id: true,
+            isDeleted: true,
           },
         },
       },
@@ -265,10 +267,11 @@ export class ShiftSlotsService {
         },
         type: {
           select: {
+            id: true,
             name: true,
             startDate: true,
             endDate: true,
-            id: true,
+            isDeleted: true,
           },
         },
       },
