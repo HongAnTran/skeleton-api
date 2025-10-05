@@ -13,14 +13,18 @@ export class ShiftSlotsService {
   constructor(private prisma: PrismaService) {}
 
   async create(userId: string, createShiftSlotDto: CreateShiftSlotDto) {
-    const { typeId, branchId, departmentId, capacity, date, note } =
+    const { typeIds, branchId, departmentIds, capacity, date, note } =
       createShiftSlotDto;
     const existingSlot = await this.prisma.shiftSlot.findFirst({
       where: {
         date: new Date(date),
-        branchId,
-        departmentId,
-        typeId,
+        branchId: branchId,
+        departmentId: {
+          in: departmentIds,
+        },
+        typeId: {
+          in: typeIds,
+        },
       },
     });
 
@@ -28,37 +32,31 @@ export class ShiftSlotsService {
       throw new BadRequestException('Đã có ca làm việc trong ngày này');
     }
 
-    return this.prisma.shiftSlot.create({
-      data: {
-        capacity,
-        user: {
-          connect: {
-            id: userId,
-          },
-        },
-        branch: {
-          connect: {
-            id: branchId,
-          },
-        },
-        department: {
-          connect: {
-            id: departmentId,
-          },
-        },
-        date: new Date(date),
-        note,
-        type: {
-          connect: {
-            id: typeId,
-          },
-        },
-      },
-    });
+    for await (const typeId of typeIds) {
+      const data: Prisma.ShiftSlotCreateManyInput[] = departmentIds.map(
+        (departmentId) => ({
+          capacity,
+          userId,
+          branchId,
+          departmentId,
+          typeId,
+          date: new Date(date),
+          note,
+        }),
+      );
+
+      await this.prisma.shiftSlot.createMany({
+        data,
+      });
+    }
+
+    return {
+      message: 'Ca làm việc đã được tạo thành công',
+    };
   }
 
   async createMany(userId: string, createShiftSlotDto: CreateShiftSlotDto) {
-    const { date, endDate, branchId, departmentId, typeId, capacity, note } =
+    const { date, endDate, branchId, departmentIds, typeIds, capacity, note } =
       createShiftSlotDto;
     if (endDate) {
       const startDate = new Date(date);
@@ -76,8 +74,12 @@ export class ShiftSlotsService {
             lte: endDateValue,
           },
           branchId,
-          departmentId,
-          typeId,
+          departmentId: {
+            in: departmentIds,
+          },
+          typeId: {
+            in: typeIds,
+          },
         },
       });
       if (existingSlot) {
@@ -94,19 +96,31 @@ export class ShiftSlotsService {
         currentDate.setDate(currentDate.getDate() + 1);
       }
 
-      const data = dates.map((date) => ({
-        date,
-        capacity,
-        userId,
-        branchId,
-        departmentId,
-        typeId,
-        note,
-      }));
+      const allData: Prisma.ShiftSlotCreateManyInput[] = [];
 
-      return await this.prisma.shiftSlot.createMany({
-        data,
+      for (const date of dates) {
+        for (const typeId of typeIds) {
+          for (const departmentId of departmentIds) {
+            allData.push({
+              date,
+              capacity,
+              userId,
+              branchId,
+              departmentId,
+              typeId,
+              note,
+            });
+          }
+        }
+      }
+
+      await this.prisma.shiftSlot.createMany({
+        data: allData,
       });
+
+      return {
+        message: 'Ca làm việc đã được tạo thành công',
+      };
     } else {
       throw new BadRequestException('Ngày kết thúc không được để trống');
     }
@@ -285,14 +299,14 @@ export class ShiftSlotsService {
         );
       }
 
-      const updateData = { ...updateShiftSlotDto } as any;
-      if (updateShiftSlotDto.date) {
-        updateData.date = new Date(updateShiftSlotDto.date);
-      }
-
       return await this.prisma.shiftSlot.update({
         where: { id },
-        data: updateData,
+        data: {
+          ...updateShiftSlotDto,
+          date: updateShiftSlotDto.date
+            ? new Date(updateShiftSlotDto.date)
+            : undefined,
+        },
       });
     } catch (error) {
       throw new NotFoundException(`Shift slot with ID ${id} not found`);

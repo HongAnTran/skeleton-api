@@ -12,7 +12,6 @@ import {
   ApiTags,
   ApiOperation,
   ApiResponse,
-  ApiQuery,
   ApiBearerAuth,
 } from '@nestjs/swagger';
 import { ShiftSlotsService } from './shift-slots.service';

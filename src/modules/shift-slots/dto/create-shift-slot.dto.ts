@@ -5,6 +5,7 @@ import {
   IsInt,
   Min,
   IsOptional,
+  IsArray,
 } from 'class-validator';
 
 export class CreateShiftSlotDto {
@@ -13,8 +14,8 @@ export class CreateShiftSlotDto {
   branchId: string;
 
   @ApiProperty()
-  @IsString()
-  departmentId: string;
+  @IsArray()
+  departmentIds: string[];
 
   @ApiProperty({ example: 5, minimum: 1 })
   @IsInt()
@@ -36,6 +37,6 @@ export class CreateShiftSlotDto {
   endDate: string;
 
   @ApiProperty()
-  @IsString()
-  typeId: string;
+  @IsArray()
+  typeIds: string[];
 }

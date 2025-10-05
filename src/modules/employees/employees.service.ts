@@ -45,6 +45,7 @@ export class EmployeesService {
           select: {
             id: true,
             email: true,
+            username: true,
           },
         },
         branch: {
@@ -72,6 +73,13 @@ export class EmployeesService {
     const employee = await this.prisma.employee.findUnique({
       where: { id },
       include: {
+        account: {
+          select: {
+            id: true,
+            email: true,
+            username: true,
+          },
+        },
         user: {
           select: {
             id: true,
