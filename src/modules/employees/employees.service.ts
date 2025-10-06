@@ -64,6 +64,9 @@ export class EmployeesService {
       where,
       skip,
       take,
+      orderBy: {
+        createdAt: 'desc',
+      },
       include: {
         account: {
           select: {
