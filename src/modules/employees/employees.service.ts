@@ -289,6 +289,9 @@ export class EmployeesService {
       totalHours: signup.totalHours,
       createdAt: signup.createdAt,
       updatedAt: signup.updatedAt,
+      canceledAt: signup.canceledAt,
+      cancelReason: signup.cancelReason,
+      canceledBy: signup.canceledBy,
       slot: {
         id: signup.slot.id,
         date: signup.slot.date,
