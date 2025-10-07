@@ -15,11 +15,28 @@ export class ShiftSignupsService {
   async create(employeeId: string, createShiftSignupDto: CreateShiftSignupDto) {
     const shiftSlot = await this.prisma.shiftSlot.findUnique({
       where: { id: createShiftSignupDto.slotId },
-      include: { signups: true, type: true },
+      include: {
+        signups: {
+          where: {
+            status: {
+              not: ShiftSignupStatus.CANCELLED,
+            },
+          },
+        },
+        type: true,
+      },
     });
 
     if (!shiftSlot) {
       throw new NotFoundException('Ca làm việc không tồn tại');
+    }
+
+    const date = new Date(shiftSlot.date);
+    const currentDate = new Date();
+    if (date < currentDate) {
+      throw new BadRequestException(
+        'Không thể đăng ký ca làm việc trong quá khứ',
+      );
     }
 
     if (shiftSlot.signups.length >= shiftSlot.capacity) {
@@ -38,14 +55,6 @@ export class ShiftSignupsService {
 
     if (existingSignup) {
       throw new BadRequestException('Bạn đã đăng ký ca làm việc này');
-    }
-
-    const date = new Date(shiftSlot.date);
-    const currentDate = new Date();
-    if (date < currentDate) {
-      throw new BadRequestException(
-        'Không thể đăng ký ca làm việc trong quá khứ',
-      );
     }
 
     const employee = await this.prisma.employee.findUnique({
