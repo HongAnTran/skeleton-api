@@ -39,4 +39,11 @@ export class QueryShiftSlotDto extends PaginationDto {
   @IsOptional()
   @IsDateString()
   endDate?: string;
+
+  @ApiPropertyOptional({
+    description: 'ID nhân viên để lọc',
+  })
+  @IsOptional()
+  @IsString()
+  employeeId?: string;
 }

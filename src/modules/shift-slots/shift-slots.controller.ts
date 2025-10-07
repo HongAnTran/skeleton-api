@@ -65,6 +65,7 @@ export class ShiftSlotsController {
       startDate,
       endDate,
       skip,
+      employeeId,
     } = queryDto;
     const userId = user.userId;
     let shiftSlots, total;
@@ -78,6 +79,13 @@ export class ShiftSlotsController {
     }
     if (departmentId) {
       where.departmentId = departmentId;
+    }
+    if (employeeId) {
+      where.signups = {
+        some: {
+          employeeId,
+        },
+      };
     }
     if (typeId) {
       where.typeId = typeId;
