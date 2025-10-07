@@ -154,6 +154,8 @@ export class ShiftSlotsService {
             status: true,
             canceledAt: true,
             cancelReason: true,
+            createdAt: true,
+            canceledBy: true,
             employee: {
               select: {
                 id: true,
@@ -214,6 +216,11 @@ export class ShiftSlotsService {
         signups: {
           select: {
             id: true,
+            status: true,
+            canceledAt: true,
+            cancelReason: true,
+            canceledBy: true,
+            createdAt: true,
             employee: {
               select: {
                 id: true,
