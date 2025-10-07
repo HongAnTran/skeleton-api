@@ -212,9 +212,6 @@ export class ShiftSlotsService {
           },
         },
         signups: {
-          where: {
-            status: ShiftSignupStatus.PENDING,
-          },
           select: {
             id: true,
             employee: {
