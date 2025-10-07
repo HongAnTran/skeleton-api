@@ -214,6 +214,11 @@ export class ShiftSlotsService {
           },
         },
         signups: {
+          where: {
+            status: {
+              not: ShiftSignupStatus.CANCELLED,
+            },
+          },
           select: {
             id: true,
             status: true,
