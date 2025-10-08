@@ -294,35 +294,22 @@ export class ShiftSlotsService {
   }
 
   async update(id: string, updateShiftSlotDto: UpdateShiftSlotDto) {
-    try {
-      const shiftSlot = await this.prisma.shiftSlot.findUnique({
-        where: { id },
-        include: {
-          signups: true,
-        },
-      });
-      if (!shiftSlot) {
-        throw new NotFoundException(`Shift slot with ID ${id} not found`);
-      }
-
-      if (shiftSlot.signups.length > 0) {
-        throw new BadRequestException(
-          'Không thể cập nhật ca làm việc đã có đăng ký',
-        );
-      }
-
-      return await this.prisma.shiftSlot.update({
-        where: { id },
-        data: {
-          ...updateShiftSlotDto,
-          date: updateShiftSlotDto.date
-            ? new Date(updateShiftSlotDto.date)
-            : undefined,
-        },
-      });
-    } catch (error) {
+    const shiftSlot = await this.prisma.shiftSlot.findUnique({
+      where: { id },
+      include: {
+        signups: true,
+      },
+    });
+    if (!shiftSlot) {
       throw new NotFoundException(`Shift slot with ID ${id} not found`);
     }
+
+    return await this.prisma.shiftSlot.update({
+      where: { id },
+      data: {
+        ...updateShiftSlotDto,
+      },
+    });
   }
 
   async remove(id: string) {
