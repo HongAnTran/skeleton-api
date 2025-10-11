@@ -1,7 +1,7 @@
 import { ThrottlerModule, ThrottlerGuard } from '@nestjs/throttler';
 import { Module, MiddlewareConsumer } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
-import { APP_GUARD, APP_FILTER, APP_INTERCEPTOR } from '@nestjs/core';
+import { APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { ScheduleModule } from '@nestjs/schedule';
 
 import { AppController } from './app.controller';
@@ -10,28 +10,13 @@ import { HealthModule } from './health/health.module';
 import { DatabaseModule } from './database/database.module';
 import { LoggingMiddleware } from './common/middleware/logging.middleware';
 
-// Feature Modules
-import { AuthModule } from './modules/auth/auth.module';
-import { UsersModule } from './modules/users/users.module';
-import { EmployeesModule } from './modules/employees/employees.module';
-import { BranchesModule } from './modules/branches/branches.module';
-import { DepartmentsModule } from './modules/departments/departments.module';
-import { ShiftSlotsModule } from './modules/shift-slots/shift-slots.module';
-import { ShiftSlotTypesModule } from './modules/shift-slot-types/shift-slot-types.module';
-import { ShiftSignupsModule } from './modules/shift-signups/shift-signups.module';
-import { ShiftSwapsModule } from './modules/shift-swaps/shift-swaps.module';
-import { TasksModule } from './modules/tasks/tasks.module';
-import { ReportsModule } from './modules/reports/reports.module';
-
 import configuration from './config/configuration';
 import appConfig from './config/app.config';
 import databaseConfig from './config/database.config';
 import { validate } from './config/config.validation';
 
-// import { AllExceptionsFilter } from './common/exceptions/all-exceptions.filter';
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { NoCacheInterceptor } from './common/interceptors/no-cache.interceptor';
-import { CronModule } from './common/cron/cron.module';
 
 @Module({
   imports: [
@@ -52,19 +37,6 @@ import { CronModule } from './common/cron/cron.module';
     ScheduleModule.forRoot(),
     DatabaseModule,
     HealthModule,
-    // Feature Modules
-    AuthModule,
-    UsersModule,
-    EmployeesModule,
-    BranchesModule,
-    DepartmentsModule,
-    ShiftSlotsModule,
-    ShiftSlotTypesModule,
-    ShiftSignupsModule,
-    ShiftSwapsModule,
-    TasksModule,
-    ReportsModule,
-    CronModule,
   ],
   controllers: [AppController],
   providers: [
@@ -77,10 +49,6 @@ import { CronModule } from './common/cron/cron.module';
       provide: APP_GUARD,
       useClass: JwtAuthGuard,
     },
-    // {
-    //   provide: APP_FILTER,
-    //   useClass: AllExceptionsFilter,
-    // },
     {
       provide: APP_INTERCEPTOR,
       useClass: NoCacheInterceptor,
