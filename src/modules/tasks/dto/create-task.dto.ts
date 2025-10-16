@@ -6,6 +6,8 @@ import {
   IsInt,
   Min,
   IsUUID,
+  IsBoolean,
+  IsNumber,
 } from 'class-validator';
 import { TaskStatus } from '@prisma/client';
 
@@ -38,4 +40,24 @@ export class CreateTaskDto {
   @IsInt()
   @Min(1)
   level?: number;
+
+  @ApiProperty({ example: 1, required: false, default: false })
+  @IsOptional()
+  @IsBoolean()
+  isTeamTask?: boolean;
+
+  @ApiProperty({ example: 1, required: false, default: 1 })
+  @IsOptional()
+  @IsNumber()
+  quantity?: number;
+
+  @ApiProperty({ example: 'máy', required: false })
+  @IsOptional()
+  @IsString()
+  unit?: string;
+
+  @ApiProperty({ example: '100', required: false })
+  @IsOptional()
+  @IsNumber()
+  target?: number;
 }

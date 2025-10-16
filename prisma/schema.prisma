@@ -14,6 +14,8 @@ datasource db {
 enum TaskStatus {
   PENDING   
   DONE   
+  REJECTED
+  APPROVED
 }
 
 enum ShiftSwapStatus {
@@ -80,6 +82,7 @@ model Employee {
   phone         String?
   active        Boolean    @default(true)
   avatar        String?
+  role          String?
   currentLevel  Int        @default(1) 
   user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   branch        Branch?    @relation(fields: [branchId], references: [id])
@@ -176,6 +179,17 @@ model Task {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   level       Int       @default(1)  
+  quantity    Float?
+  unit        String?
+  target      Float?
+  completedAt DateTime?
+  completedBy String?
+  rejectedAt DateTime?
+  rejectedBy String?
+  approvedAt DateTime?
+  approvedBy String?
+  rejectedReason String?
+  isTeamTask  Boolean   @default(false)
   employee  Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
 }
 
