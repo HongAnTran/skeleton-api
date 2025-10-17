@@ -160,6 +160,7 @@ export class ShiftSlotsService {
               select: {
                 id: true,
                 name: true,
+                role: true,
               },
             },
           },
@@ -230,6 +231,7 @@ export class ShiftSlotsService {
               select: {
                 id: true,
                 name: true,
+                role: true,
               },
             },
           },
