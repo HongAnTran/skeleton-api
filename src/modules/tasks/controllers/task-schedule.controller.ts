@@ -17,7 +17,6 @@ import {
   ApiBearerAuth,
   ApiQuery,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TaskScheduleService } from '../services/task-schedule.service';
 import { CreateTaskScheduleDto } from '../dto/task-schedule/create-task-schedule.dto';
 import { UpdateTaskScheduleDto } from '../dto/task-schedule/update-task-schedule.dto';
@@ -25,7 +24,6 @@ import { QueryTaskScheduleDto } from '../dto/task-schedule/query-task-schedule.d
 
 @ApiTags('Task Schedules')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('task-schedules')
 export class TaskScheduleController {
   constructor(private readonly taskScheduleService: TaskScheduleService) {}

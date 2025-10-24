@@ -16,7 +16,6 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TaskTemplateService } from '../services/task-template.service';
 import { CreateTaskTemplateDto } from '../dto/task-template/create-task-template.dto';
 import { UpdateTaskTemplateDto } from '../dto/task-template/update-task-template.dto';
@@ -24,7 +23,6 @@ import { QueryTaskTemplateDto } from '../dto/task-template/query-task-template.d
 
 @ApiTags('Task Templates')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('task-templates')
 export class TaskTemplateController {
   constructor(private readonly taskTemplateService: TaskTemplateService) {}

@@ -16,7 +16,6 @@ import {
   ApiResponse,
   ApiBearerAuth,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { TaskCycleService } from '../services/task-cycle.service';
 import { CreateTaskCycleDto } from '../dto/task-cycle/create-task-cycle.dto';
 import { UpdateTaskCycleDto } from '../dto/task-cycle/update-task-cycle.dto';
@@ -24,7 +23,6 @@ import { QueryTaskCycleDto } from '../dto/task-cycle/query-task-cycle.dto';
 
 @ApiTags('Task Cycles')
 @ApiBearerAuth()
-@UseGuards(JwtAuthGuard)
 @Controller('task-cycles')
 export class TaskCycleController {
   constructor(private readonly taskCycleService: TaskCycleService) {}
