@@ -1,5 +1,28 @@
 # 📋 Task Management Workflow
 
+## ✨ Philosophy: Simple & Flexible
+
+Hệ thống hỗ trợ **2 loại task**:
+
+1. **Task Định Lượng** (Quantitative): Có target số lượng cụ thể
+   - Ví dụ: "Bán 50 đơn hàng", "Đạt 100 calls"
+   - Có thể update progress (quantity) để tracking
+   - Target là reference, **KHÔNG BẮT BUỘC** đạt mới complete được
+
+2. **Task Định Tính** (Qualitative): Chỉ có title + description
+   - Ví dụ: "Hoàn thành 3 video TikTok trên 1000 views", "Viết báo cáo tháng"
+   - Không cần tracking số lượng
+   - Nhân viên tự xác nhận hoàn thành, ghi rõ trong note
+   - Manager review dựa trên description/note/evidence
+
+**Core Principle:**
+
+- Nhân viên **TỰ XÁC NHẬN** khi hoàn thành
+- Manager **REVIEW & APPROVE/REJECT** dựa trên judgment
+- System không enforce rules cứng nhắc về target
+
+---
+
 ## 🎯 Flow Chính: Nhân Viên → Manager
 
 ### Bước 1: Nhân Viên Cập Nhật Tiến Độ
@@ -151,14 +174,14 @@
 
 ## 💡 Use Cases Thực Tế
 
-### Use Case 1: Nhân Viên Bán Hàng
+### Use Case 1: Task Định Lượng (Có Target) - Nhân Viên Bán Hàng
 
 ```javascript
 // 1. Nhân viên lấy task của mình
 const myTasks = await GET('/task-instances?employeeId=emp123&status=PENDING');
 // Response: [{ id: 'task1', title: 'Doanh số tháng 11', target: 50, quantity: 0 }]
 
-// 2. Mỗi ngày cập nhật tiến độ
+// 2. Mỗi ngày cập nhật tiến độ (OPTIONAL)
 await POST('/task-instances/task1/update-progress', {
   delta: 5,
   note: 'Bán được 5 đơn hôm nay',
@@ -183,6 +206,7 @@ await POST('/task-instances/task1/complete', {
   note: 'Đã hoàn thành đủ 50 đơn hàng',
 });
 // Status: IN_PROGRESS → COMPLETED
+// ✅ Không cần đạt target mới complete được! Manager sẽ review.
 
 // 4. Manager xem danh sách chờ duyệt
 const pendingApprovals = await GET('/task-instances?status=COMPLETED');
@@ -195,7 +219,40 @@ await POST('/task-instances/task1/approve', {
 // Status: COMPLETED → APPROVED ✅
 ```
 
-### Use Case 2: Task Bị Reject
+### Use Case 2: Task Định Tính (Không Target) - Content Creation
+
+```javascript
+// 1. Nhân viên nhận task
+const task = await GET('/task-instances/task2');
+// Response: {
+//   id: 'task2',
+//   title: 'Hoàn thành 3 video TikTok trên 1000 View',
+//   description: 'Mỗi video phải đạt ít nhất 1000 views. Gửi link trong note.',
+//   target: null,  // ← Không có target số lượng
+//   quantity: 0
+// }
+
+// 2. Nhân viên làm xong và TỰ XÁC NHẬN hoàn thành
+await POST('/task-instances/task2/complete', {
+  note: `
+    Đã hoàn thành 3 videos:
+    1. Tutorial makeup - 1,250 views: https://tiktok.com/@user/video/1
+    2. Dance challenge - 1,500 views: https://tiktok.com/@user/video/2
+    3. Product review - 2,000 views: https://tiktok.com/@user/video/3
+  `,
+});
+// Status: PENDING → COMPLETED ✅
+// Không cần update-progress, không cần đạt target!
+
+// 3. Manager kiểm tra link và phê duyệt
+await POST('/task-instances/task2/approve', {
+  approvedBy: 'manager123',
+  reason: 'Tất cả videos đạt yêu cầu!',
+});
+// Status: COMPLETED → APPROVED ✅
+```
+
+### Use Case 3: Task Bị Reject
 
 ```javascript
 // 1. Manager reject task
@@ -371,7 +428,7 @@ await POST('/task-instances/task1/approve', {
 ### Complete Task
 
 - ✅ Status phải là: PENDING, IN_PROGRESS, hoặc REJECTED
-- ✅ Quantity phải >= Target (nếu có target)
+- ✅ **KHÔNG BẮT BUỘC** đạt target - Nhân viên tự xác nhận, Manager review
 - ❌ Không thể complete task đã COMPLETED/APPROVED/EXPIRED
 
 ### Approve Task
@@ -390,19 +447,24 @@ await POST('/task-instances/task1/approve', {
 ## 🎯 Best Practices
 
 1. **Nhân viên:**
-   - Update progress thường xuyên
-   - Complete ngay khi đạt target
+   - **Task định lượng (có target):** Update progress thường xuyên để tracking
+   - **Task định tính (không target):** Viết rõ ràng trong note khi complete
+   - Complete khi tự đánh giá đã hoàn thành (không bắt buộc đạt target)
    - Check rejected tasks để xử lý kịp thời
+   - Cung cấp evidence (link, screenshot, báo cáo) trong note để Manager dễ review
 
 2. **Manager:**
    - Review tasks chờ duyệt hàng ngày
-   - Provide clear feedback khi reject
+   - Kiểm tra kỹ note/description của nhân viên
+   - Provide clear feedback khi reject (lý do cụ thể)
+   - Linh hoạt approve ngay cả khi chưa đạt 100% target (nếu có lý do chính đáng)
    - Track team completion rate
 
 3. **System:**
    - Auto-notify khi có tasks chờ duyệt
    - Mark expired tasks tự động
    - Generate reports định kỳ
+   - Support cả task định lượng (có target) và định tính (chỉ có title/description)
 
 ---
 

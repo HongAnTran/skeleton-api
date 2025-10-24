@@ -58,13 +58,8 @@ export class TaskScheduleController {
     required: false,
     description: 'Generate cycles up to this date (ISO format)',
   })
-  generateCycles(
-    @Request() req,
-    @Param('id') id: string,
-    @Body() body: { upToDate?: string },
-  ) {
-    const date = body.upToDate ? new Date(body.upToDate) : new Date();
-    return this.taskScheduleService.generateCycles(req.user.userId, id, date);
+  generateCycles(@Request() req, @Param('id') id: string) {
+    return this.taskScheduleService.generateCycles(req.user.userId, id);
   }
 
   @Post('generate-all-cycles')
@@ -78,12 +73,8 @@ export class TaskScheduleController {
     required: false,
     description: 'Generate cycles up to this date (ISO format)',
   })
-  generateAllCycles(@Request() req, @Query('upToDate') upToDate?: string) {
-    const date = upToDate ? new Date(upToDate) : new Date();
-    return this.taskScheduleService.generateAllActiveCycles(
-      req.user.userId,
-      date,
-    );
+  generateAllCycles(@Request() req) {
+    return this.taskScheduleService.generateAllActiveCycles(req.user.userId);
   }
 
   @Patch(':id')

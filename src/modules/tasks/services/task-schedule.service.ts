@@ -152,11 +152,7 @@ export class TaskScheduleService {
   /**
    * Generate cycles for a schedule up to a certain date
    */
-  async generateCycles(
-    userId: string,
-    scheduleId: string,
-    upToDate: Date = new Date(),
-  ) {
+  async generateCycles(userId: string, scheduleId: string) {
     const schedule = await this.prisma.taskSchedule.findUnique({
       where: {
         id: scheduleId,
@@ -183,10 +179,6 @@ export class TaskScheduleService {
     const lastCycleEnd = schedule.cycles[0]?.periodEnd || schedule.startDate;
     const nextStart = new Date(lastCycleEnd);
 
-    if (nextStart >= upToDate) {
-      return [];
-    }
-
     const cyclesToCreate: Array<{
       scheduleId: string;
       periodStart: Date;
@@ -194,8 +186,9 @@ export class TaskScheduleService {
     }> = [];
 
     let currentStart = new Date(nextStart);
+    let currentEnd = new Date(currentStart);
 
-    while (currentStart < upToDate) {
+    while (currentStart < currentEnd) {
       const currentEnd = this.calculatePeriodEnd(
         currentStart,
         schedule.frequency,
@@ -282,15 +275,12 @@ export class TaskScheduleService {
   /**
    * Generate cycles for all active schedules
    */
-  async generateAllActiveCycles(userId: string, upToDate: Date = new Date()) {
+  async generateAllActiveCycles(userId: string) {
     const activeSchedules = await this.prisma.taskSchedule.findMany({
       where: {
         template: {
           userId,
           isActive: true,
-        },
-        startDate: {
-          lte: upToDate,
         },
         OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
       },
@@ -298,7 +288,7 @@ export class TaskScheduleService {
 
     const results = [];
     for (const schedule of activeSchedules) {
-      const cycles = await this.generateCycles(userId, schedule.id, upToDate);
+      const cycles = await this.generateCycles(userId, schedule.id);
       results.push({
         scheduleId: schedule.id,
         cyclesCreated: cycles.length,

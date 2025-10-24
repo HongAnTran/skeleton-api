@@ -316,12 +316,9 @@ export class TaskInstanceService {
       );
     }
 
-    // Check if target is met (if target is set)
-    if (instance.target && instance.quantity < instance.target) {
-      throw new BadRequestException(
-        `Task quantity (${instance.quantity}) has not reached target (${instance.target})`,
-      );
-    }
+    // ✅ SIMPLIFIED: No target validation required
+    // Nhân viên tự xác nhận hoàn thành, Manager sẽ review và approve/reject
+    // Target/quantity chỉ là reference, không bắt buộc đạt mới complete được
 
     // Create completion event in progress history
     await this.prisma.$transaction(async (tx) => {
