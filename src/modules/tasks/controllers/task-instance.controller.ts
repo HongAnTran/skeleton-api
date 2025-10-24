@@ -44,6 +44,15 @@ export class TaskInstanceController {
   findAll(@Request() req, @Query() query: QueryTaskInstanceDto) {
     return this.taskInstanceService.findAll(req.user.userId, query);
   }
+  @Get('employee')
+  @ApiOperation({ summary: 'Get all task instances by employee' })
+  @ApiResponse({ status: 200, description: 'Return all instances' })
+  findAllByEmployee(@Request() req) {
+    return this.taskInstanceService.findAllByEmployee(
+      req.user.userId,
+      req.user.employeeId,
+    );
+  }
 
   @Get('statistics')
   @ApiOperation({ summary: 'Get task instance statistics' })
@@ -102,7 +111,11 @@ export class TaskInstanceController {
     @Param('id') id: string,
     @Body() completeDto: CompleteTaskInstanceDto,
   ) {
-    return this.taskInstanceService.complete(req.user.employeeId, id, completeDto);
+    return this.taskInstanceService.complete(
+      req.user.employeeId,
+      id,
+      completeDto,
+    );
   }
 
   @Post(':id/approve')

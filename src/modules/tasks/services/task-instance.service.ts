@@ -118,6 +118,26 @@ export class TaskInstanceService {
     });
   }
 
+  async findAllByEmployee(userId: string, employeeId: string) {
+    return this.prisma.taskInstance.findMany({
+      where: {
+        employeeId,
+        template: {
+          userId,
+        },
+      },
+      include: {
+        template: true,
+        cycle: true,
+        employee: true,
+        department: true,
+      },
+      orderBy: {
+        createdAt: 'desc',
+      },
+    });
+  }
+
   async findOne(userId: string, id: string) {
     const instance = await this.prisma.taskInstance.findFirst({
       where: {
@@ -330,6 +350,8 @@ export class TaskInstanceService {
       });
     });
 
+    await this.promoteToNextLevel(employeeId);
+
     // Return updated instance
     return this.prisma.taskInstance.findUnique({
       where: { id: instanceId },
@@ -339,6 +361,43 @@ export class TaskInstanceService {
         employee: true,
         department: true,
       },
+    });
+  }
+
+  // promote to next level
+  async promoteToNextLevel(employeeId: string) {
+    const employee = await this.prisma.employee.findUnique({
+      where: {
+        id: employeeId,
+      },
+    });
+
+    if (!employee) {
+      throw new NotFoundException(`Employee with ID ${employeeId} not found`);
+    }
+
+    const nextLevel = employee.currentLevel + 1;
+    const taskInstances = await this.prisma.taskInstance.findMany({
+      where: {
+        employeeId,
+        level: nextLevel,
+        status: {
+          in: [
+            TaskStatusV2.PENDING,
+            TaskStatusV2.IN_PROGRESS,
+            TaskStatusV2.REJECTED,
+          ],
+        },
+      },
+    });
+
+    if (taskInstances.length > 0) {
+      throw new BadRequestException('There are tasks at the next level');
+    }
+
+    return this.prisma.employee.update({
+      where: { id: employeeId },
+      data: { currentLevel: nextLevel },
     });
   }
 
@@ -373,7 +432,6 @@ export class TaskInstanceService {
     }
 
     const result = await this.prisma.$transaction(async (tx) => {
-      // Create approval record
       await tx.taskApproval.create({
         data: {
           instanceId: instance.id,
@@ -383,7 +441,6 @@ export class TaskInstanceService {
         },
       });
 
-      // Update instance
       const updatedInstance = await tx.taskInstance.update({
         where: { id: instanceId },
         data: {
@@ -399,30 +456,12 @@ export class TaskInstanceService {
         },
       });
 
-      // If this is a department task with aggregation, update parent level
-      if (
-        instance.scope === TaskScope.INDIVIDUAL &&
-        instance.level > 1 &&
-        instance.departmentId
-      ) {
-        await this.aggregateToParentLevel(
-          tx,
-          instance.cycleId,
-          instance.departmentId,
-          instance.level,
-          instance.template.aggregation,
-        );
-      }
-
       return updatedInstance;
     });
 
     return result;
   }
 
-  /**
-   * Reject a completed task instance
-   */
   async reject(
     userId: string,
     instanceId: string,
@@ -479,9 +518,6 @@ export class TaskInstanceService {
     return result;
   }
 
-  /**
-   * Mark expired tasks
-   */
   async markExpired(userId: string, cycleId: string) {
     const cycle = await this.prisma.taskCycle.findFirst({
       where: {
@@ -528,80 +564,6 @@ export class TaskInstanceService {
     };
   }
 
-  /**
-   * Aggregate child level tasks to parent level (for hierarchical approval)
-   */
-  private async aggregateToParentLevel(
-    tx: any,
-    cycleId: string,
-    departmentId: string,
-    childLevel: number,
-    aggregation: Aggregation,
-  ) {
-    const parentLevel = childLevel + 1;
-
-    // Get all child tasks at this level for this department
-    const childTasks = await tx.taskInstance.findMany({
-      where: {
-        cycleId,
-        departmentId,
-        level: childLevel,
-        status: TaskStatusV2.APPROVED,
-      },
-    });
-
-    if (childTasks.length === 0) return;
-
-    // Find or create parent task
-    let parentTask = await tx.taskInstance.findFirst({
-      where: {
-        cycleId,
-        departmentId,
-        level: parentLevel,
-        scope: TaskScope.DEPARTMENT,
-      },
-    });
-
-    // Calculate aggregated value
-    let aggregatedValue = 0;
-
-    switch (aggregation) {
-      case Aggregation.SUM:
-        aggregatedValue = childTasks.reduce(
-          (sum, task) => sum + task.quantity,
-          0,
-        );
-        break;
-      case Aggregation.AVERAGE:
-        aggregatedValue =
-          childTasks.reduce((sum, task) => sum + task.quantity, 0) /
-          childTasks.length;
-        break;
-      case Aggregation.MAX:
-        aggregatedValue = Math.max(...childTasks.map((task) => task.quantity));
-        break;
-      case Aggregation.MIN:
-        aggregatedValue = Math.min(...childTasks.map((task) => task.quantity));
-        break;
-      case Aggregation.COUNT:
-        aggregatedValue = childTasks.length;
-        break;
-    }
-
-    if (parentTask) {
-      // Update existing parent task
-      await tx.taskInstance.update({
-        where: { id: parentTask.id },
-        data: {
-          quantity: aggregatedValue,
-        },
-      });
-    }
-  }
-
-  /**
-   * Get task instance statistics
-   */
   async getStatistics(userId: string, query: QueryTaskInstanceDto) {
     const where: any = {
       template: {
