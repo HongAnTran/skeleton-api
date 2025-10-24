@@ -13,10 +13,6 @@ import { TaskScheduleController } from './controllers/task-schedule.controller';
 import { TaskCycleController } from './controllers/task-cycle.controller';
 import { TaskInstanceController } from './controllers/task-instance.controller';
 
-// Legacy (if needed for backward compatibility)
-import { TasksController } from './tasks.controller';
-import { TasksService } from './tasks.service';
-
 @Module({
   imports: [DatabaseModule],
   controllers: [
