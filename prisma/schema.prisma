@@ -11,12 +11,7 @@ datasource db {
 
 
 
-enum TaskStatus {
-  PENDING   
-  DONE   
-  REJECTED
-  APPROVED
-}
+
 
 enum ShiftSwapStatus {
   PENDING
@@ -52,6 +47,7 @@ model User {
   departments  Department[]
   shiftSlots   ShiftSlot[]   
   shiftSlotTypes ShiftSlotType[]
+  taskTemplates TaskTemplate[]
 }
 model Account {
   id                  String   @id @default(cuid()) 
@@ -90,10 +86,10 @@ model Employee {
   shiftSignups  ShiftSignup[]
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
-  tasks Task[]
   // Shift swap relations
   swapRequestsSent ShiftSwapRequest[] @relation("ShiftSwapRequester")
   swapRequestsReceived ShiftSwapRequest[] @relation("ShiftSwapTarget") 
+  tasks TaskInstance[]
 }
 
 model Branch {
@@ -118,6 +114,7 @@ model Department {
   createdAt    DateTime   @default(now())
   employees  Employee[]
   shiftSlots ShiftSlot[]
+  tasks TaskInstance[]
 }
 
 
@@ -170,28 +167,7 @@ model ShiftSignup {
   slot        ShiftSlot @relation(fields: [slotId], references: [id], onDelete: Cascade)
   updatedAt   DateTime   @updatedAt
 }
-model Task {
-  id          String     @id @default(cuid())
-  employeeId  String
-  title       String
-  description String?
-  status      TaskStatus @default(PENDING)
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
-  level       Int       @default(1)  
-  quantity    Float?
-  unit        String?
-  target      Float?
-  completedAt DateTime?
-  completedBy String?
-  rejectedAt DateTime?
-  rejectedBy String?
-  approvedAt DateTime?
-  approvedBy String?
-  rejectedReason String?
-  isTeamTask  Boolean   @default(false)
-  employee  Employee      @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-}
+
 
 model ShiftSwapRequest {
   id              String          @id @default(cuid())
@@ -216,3 +192,153 @@ model ShiftSwapRequest {
   @@index([targetId])
   @@index([status])
 }
+
+
+
+
+enum TaskStatusV2 {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
+enum TaskScope {
+  INDIVIDUAL
+  DEPARTMENT
+}
+
+enum Frequency {
+  NONE
+  DAILY
+  WEEKLY
+  MONTHLY
+  QUARTERLY
+  YEARLY
+}
+
+enum Aggregation {
+  COUNT
+  SUM
+  AVERAGE
+  MAX
+  MIN
+}
+
+model TaskTemplate {
+  id            String      @id @default(cuid())
+  title         String
+  description   String?
+  scope         TaskScope
+  unit          String?
+  defaultTarget Float?
+  aggregation   Aggregation @default(COUNT)
+  isActive      Boolean     @default(true)
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  schedules     TaskSchedule[]
+  instances     TaskInstance[]
+  user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  userId        String
+}
+
+model TaskSchedule {
+  id           String      @id @default(cuid())
+  templateId   String
+  template     TaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  frequency    Frequency   @default(MONTHLY)
+  interval     Int         @default(1)
+  dayOfMonth   Int?
+  startDate    DateTime
+  endDate      DateTime?
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+
+  cycles       TaskCycle[]
+}
+
+model TaskCycle {
+  id           String      @id @default(cuid())
+  scheduleId   String
+  schedule     TaskSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+  periodStart  DateTime
+  periodEnd    DateTime
+  generatedAt  DateTime    @default(now())
+  status       TaskStatusV2  @default(IN_PROGRESS)
+
+  instances    TaskInstance[]
+
+  @@unique([scheduleId, periodStart, periodEnd])
+}
+
+model TaskInstance {
+  id             String      @id @default(cuid())
+  templateId     String
+  template       TaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  cycleId        String
+  cycle          TaskCycle    @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+
+  scope          TaskScope
+  employeeId     String?
+  departmentId   String?
+  employee       Employee?   @relation(fields: [employeeId], references: [id])
+  department     Department? @relation(fields: [departmentId], references: [id])
+
+
+
+  level          Int         @default(1)   
+  required       Boolean     @default(true) 
+
+  title          String
+  description    String?
+  target         Float?
+  unit           String?
+  quantity       Float       @default(0)
+  status         TaskStatusV2  @default(PENDING)
+  completedAt    DateTime?
+  completedBy    String?
+  approvedAt     DateTime?
+  approvedBy     String?
+  rejectedAt     DateTime?
+  rejectedBy     String?
+  rejectedReason String?
+
+  createdAt      DateTime    @default(now())
+  updatedAt      DateTime    @updatedAt
+
+  progressEvents TaskProgressEvent[]
+  approvals      TaskApproval[]
+
+  @@index([cycleId, scope, level, status])
+  @@index([employeeId])
+  @@index([departmentId])
+}
+
+model TaskProgressEvent {
+  id           String       @id @default(cuid())
+  instanceId   String
+  instance     TaskInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  delta        Float
+  source       String?
+  note         String?
+  occurredAt   DateTime
+  createdAt    DateTime     @default(now())
+  createdBy    String?
+
+  @@index([instanceId, occurredAt])
+}
+
+model TaskApproval {
+  id           String        @id @default(cuid())
+  instanceId   String
+  instance     TaskInstance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
+  action       String        
+  reason       String?
+  actedBy      String
+  actedAt      DateTime      @default(now())
+}
+
