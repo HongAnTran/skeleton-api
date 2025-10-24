@@ -157,7 +157,7 @@ export class TaskScheduleService {
     scheduleId: string,
     upToDate: Date = new Date(),
   ) {
-    const schedule = await this.prisma.taskSchedule.findFirst({
+    const schedule = await this.prisma.taskSchedule.findUnique({
       where: {
         id: scheduleId,
         template: {
@@ -180,11 +180,9 @@ export class TaskScheduleService {
       );
     }
 
-    // Determine the last cycle end date or use schedule start date
     const lastCycleEnd = schedule.cycles[0]?.periodEnd || schedule.startDate;
     const nextStart = new Date(lastCycleEnd);
 
-    // If last cycle ended after upToDate, no new cycles needed
     if (nextStart >= upToDate) {
       return [];
     }
@@ -205,7 +203,6 @@ export class TaskScheduleService {
         schedule.dayOfMonth,
       );
 
-      // Check if end date exceeds schedule's end date
       if (schedule.endDate && currentEnd > schedule.endDate) {
         break;
       }

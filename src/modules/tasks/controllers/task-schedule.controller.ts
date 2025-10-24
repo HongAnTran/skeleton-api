@@ -61,9 +61,9 @@ export class TaskScheduleController {
   generateCycles(
     @Request() req,
     @Param('id') id: string,
-    @Query('upToDate') upToDate?: string,
+    @Body() body: { upToDate?: string },
   ) {
-    const date = upToDate ? new Date(upToDate) : new Date();
+    const date = body.upToDate ? new Date(body.upToDate) : new Date();
     return this.taskScheduleService.generateCycles(req.user.userId, id, date);
   }
 

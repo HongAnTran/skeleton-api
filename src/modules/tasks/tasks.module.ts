@@ -20,16 +20,12 @@ import { TaskInstanceController } from './controllers/task-instance.controller';
     TaskScheduleController,
     TaskCycleController,
     TaskInstanceController,
-    // Keep old controller if needed for backward compatibility
-    // TasksController,
   ],
   providers: [
     TaskTemplateService,
     TaskScheduleService,
     TaskCycleService,
     TaskInstanceService,
-    // Keep old service if needed
-    // TasksService,
   ],
   exports: [
     TaskTemplateService,
