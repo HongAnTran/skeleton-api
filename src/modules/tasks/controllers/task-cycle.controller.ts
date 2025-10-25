@@ -56,19 +56,19 @@ export class TaskCycleController {
     return this.taskCycleService.getCycleStatistics(req.user.userId, id);
   }
 
-  @Post(':id/generate-instances')
-  @ApiOperation({ summary: 'Generate task instances for a cycle' })
-  @ApiResponse({
-    status: 200,
-    description: 'Instances generated successfully',
-  })
-  @ApiResponse({
-    status: 400,
-    description: 'Instances already exist for this cycle',
-  })
-  generateInstances(@Request() req, @Param('id') id: string) {
-    return this.taskCycleService.generateInstances(req.user.userId, id);
-  }
+  // @Post(':id/generate-instances')
+  // @ApiOperation({ summary: 'Generate task instances for a cycle' })
+  // @ApiResponse({
+  //   status: 200,
+  //   description: 'Instances generated successfully',
+  // })
+  // @ApiResponse({
+  //   status: 400,
+  //   description: 'Instances already exist for this cycle',
+  // })
+  // generateInstances(@Request() req, @Param('id') id: string) {
+  //   return this.taskCycleService.generateInstances(req.user.userId, id);
+  // }
 
   @Post(':id/update-status')
   @ApiOperation({

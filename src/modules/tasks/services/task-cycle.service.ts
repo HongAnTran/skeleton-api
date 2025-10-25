@@ -178,106 +178,106 @@ export class TaskCycleService {
     });
   }
 
-  /**
-   * Generate task instances for a cycle
-   * This creates individual or department tasks based on the template scope
-   */
-  async generateInstances(userId: string, cycleId: string) {
-    const cycle = await this.prisma.taskCycle.findFirst({
-      where: {
-        id: cycleId,
-        schedule: {
-          template: {
-            userId,
-          },
-        },
-      },
-      include: {
-        schedule: {
-          include: {
-            template: true,
-          },
-        },
-        instances: true,
-      },
-    });
+  // /**
+  //  * Generate task instances for a cycle
+  //  * This creates individual or department tasks based on the template scope
+  //  */
+  // async generateInstances(userId: string, cycleId: string) {
+  //   const cycle = await this.prisma.taskCycle.findFirst({
+  //     where: {
+  //       id: cycleId,
+  //       schedule: {
+  //         template: {
+  //           userId,
+  //         },
+  //       },
+  //     },
+  //     include: {
+  //       schedule: {
+  //         include: {
+  //           template: true,
+  //         },
+  //       },
+  //       instances: true,
+  //     },
+  //   });
 
-    if (!cycle) {
-      throw new NotFoundException(`TaskCycle with ID ${cycleId} not found`);
-    }
+  //   if (!cycle) {
+  //     throw new NotFoundException(`TaskCycle with ID ${cycleId} not found`);
+  //   }
 
-    // Don't generate if instances already exist
-    if (cycle.instances.length > 0) {
-      throw new BadRequestException('Instances already exist for this cycle');
-    }
+  //   // Don't generate if instances already exist
+  //   if (cycle.instances.length > 0) {
+  //     throw new BadRequestException('Instances already exist for this cycle');
+  //   }
 
-    const template = cycle.schedule.template;
+  //   const template = cycle.schedule.template;
 
-    const instancesToCreate = [];
+  //   const instancesToCreate = [];
 
-    if (template.scope === TaskScope.INDIVIDUAL) {
-      // Get all active employees for this user
-      const employees = await this.prisma.employee.findMany({
-        where: {
-          userId,
-          active: true,
-        },
-      });
+  //   if (template.scope === TaskScope.INDIVIDUAL) {
+  //     // Get all active employees for this user
+  //     const employees = await this.prisma.employee.findMany({
+  //       where: {
+  //         userId,
+  //         active: true,
+  //       },
+  //     });
 
-      for (const employee of employees) {
-        instancesToCreate.push({
-          templateId: template.id,
-          cycleId: cycle.id,
-          scope: TaskScope.INDIVIDUAL,
-          employeeId: employee.id,
-          departmentId: null,
-          level: 1,
-          required: true,
-          title: template.title,
-          description: template.description,
-          target: template.defaultTarget,
-          unit: template.unit,
-          quantity: 0,
-          status: TaskStatusV2.PENDING,
-        });
-      }
-    } else if (template.scope === TaskScope.DEPARTMENT) {
-      // Get all departments for this user
-      const departments = await this.prisma.department.findMany({
-        where: {
-          userId,
-        },
-      });
+  //     for (const employee of employees) {
+  //       instancesToCreate.push({
+  //         templateId: template.id,
+  //         cycleId: cycle.id,
+  //         scope: TaskScope.INDIVIDUAL,
+  //         employeeId: employee.id,
+  //         departmentId: null,
+  //         level: 1,
+  //         required: true,
+  //         title: template.title,
+  //         description: template.description,
+  //         target: template.defaultTarget,
+  //         unit: template.unit,
+  //         quantity: 0,
+  //         status: TaskStatusV2.PENDING,
+  //       });
+  //     }
+  //   } else if (template.scope === TaskScope.DEPARTMENT) {
+  //     // Get all departments for this user
+  //     const departments = await this.prisma.department.findMany({
+  //       where: {
+  //         userId,
+  //       },
+  //     });
 
-      for (const department of departments) {
-        instancesToCreate.push({
-          templateId: template.id,
-          cycleId: cycle.id,
-          scope: TaskScope.DEPARTMENT,
-          employeeId: null,
-          departmentId: department.id,
-          level: 1,
-          required: true,
-          title: template.title,
-          description: template.description,
-          target: template.defaultTarget,
-          unit: template.unit,
-          quantity: 0,
-          status: TaskStatusV2.PENDING,
-        });
-      }
-    }
+  //     for (const department of departments) {
+  //       instancesToCreate.push({
+  //         templateId: template.id,
+  //         cycleId: cycle.id,
+  //         scope: TaskScope.DEPARTMENT,
+  //         employeeId: null,
+  //         departmentId: department.id,
+  //         level: 1,
+  //         required: true,
+  //         title: template.title,
+  //         description: template.description,
+  //         target: template.defaultTarget,
+  //         unit: template.unit,
+  //         quantity: 0,
+  //         status: TaskStatusV2.PENDING,
+  //       });
+  //     }
+  //   }
 
-    // Create all instances
-    const createdInstances = await this.prisma.taskInstance.createMany({
-      data: instancesToCreate,
-    });
+  //   // Create all instances
+  //   const createdInstances = await this.prisma.taskInstance.createMany({
+  //     data: instancesToCreate,
+  //   });
 
-    return {
-      cycleId: cycle.id,
-      instancesCreated: createdInstances.count,
-    };
-  }
+  //   return {
+  //     cycleId: cycle.id,
+  //     instancesCreated: createdInstances.count,
+  //   };
+  // }
 
   /**
    * Update cycle status based on its instances

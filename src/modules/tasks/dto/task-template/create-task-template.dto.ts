@@ -29,6 +29,10 @@ export class CreateTaskTemplateDto {
   @IsEnum(TaskScope)
   scope: TaskScope;
 
+  @ApiProperty({ example: 1 })
+  @IsNumber()
+  level: number;
+
   @ApiProperty({ example: 'units', required: false })
   @IsOptional()
   @IsString()

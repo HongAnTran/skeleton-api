@@ -150,22 +150,19 @@ export class TaskScheduleService {
   }
 
   /**
-   * Generate cycles for a schedule up to a certain date
+   * Generate cycles for a schedule based on startDate and endDate
+   * Simple: Generate ALL cycles between startDate and endDate
+   *
+   * Example:
+   *   - MONTHLY schedule from 2025-11-01 to 2025-12-31
+   *   - Will create 2 cycles: Nov (11/1-11/30) and Dec (12/1-12/31)
    */
   async generateCycles(userId: string, scheduleId: string) {
-    const schedule = await this.prisma.taskSchedule.findUnique({
+    const schedule = await this.prisma.taskSchedule.findFirst({
       where: {
         id: scheduleId,
         template: {
           userId,
-        },
-      },
-      include: {
-        cycles: {
-          orderBy: {
-            periodStart: 'desc',
-          },
-          take: 1,
         },
       },
     });
@@ -176,8 +173,11 @@ export class TaskScheduleService {
       );
     }
 
-    const lastCycleEnd = schedule.cycles[0]?.periodEnd || schedule.startDate;
-    const nextStart = new Date(lastCycleEnd);
+    if (!schedule.endDate) {
+      throw new BadRequestException(
+        'Schedule must have an endDate to generate cycles',
+      );
+    }
 
     const cyclesToCreate: Array<{
       scheduleId: string;
@@ -185,10 +185,10 @@ export class TaskScheduleService {
       periodEnd: Date;
     }> = [];
 
-    let currentStart = new Date(nextStart);
-    let currentEnd = new Date(currentStart);
+    let currentStart = new Date(schedule.startDate);
 
-    while (currentStart < currentEnd) {
+    // Generate all cycles from startDate to endDate
+    while (currentStart <= schedule.endDate) {
       const currentEnd = this.calculatePeriodEnd(
         currentStart,
         schedule.frequency,
@@ -196,19 +196,24 @@ export class TaskScheduleService {
         schedule.dayOfMonth,
       );
 
-      if (schedule.endDate && currentEnd > schedule.endDate) {
-        break;
-      }
+      // If period end exceeds schedule endDate, adjust it
+      const finalEnd =
+        currentEnd > schedule.endDate ? schedule.endDate : currentEnd;
 
       cyclesToCreate.push({
         scheduleId: schedule.id,
         periodStart: new Date(currentStart),
-        periodEnd: currentEnd,
+        periodEnd: finalEnd,
       });
 
       // Move to next period
       currentStart = new Date(currentEnd);
       currentStart.setMilliseconds(currentStart.getMilliseconds() + 1);
+
+      // Stop if we've passed the endDate
+      if (currentStart > schedule.endDate) {
+        break;
+      }
     }
 
     // Create cycles in database
@@ -273,7 +278,7 @@ export class TaskScheduleService {
   }
 
   /**
-   * Generate cycles for all active schedules
+   * Generate cycles for all active schedules that have endDate
    */
   async generateAllActiveCycles(userId: string) {
     const activeSchedules = await this.prisma.taskSchedule.findMany({
@@ -282,17 +287,33 @@ export class TaskScheduleService {
           userId,
           isActive: true,
         },
-        OR: [{ endDate: null }, { endDate: { gte: new Date() } }],
+        endDate: {
+          not: null, // Only schedules with endDate
+        },
+      },
+      include: {
+        template: true,
       },
     });
 
     const results = [];
     for (const schedule of activeSchedules) {
-      const cycles = await this.generateCycles(userId, schedule.id);
-      results.push({
-        scheduleId: schedule.id,
-        cyclesCreated: cycles.length,
-      });
+      try {
+        const cycles = await this.generateCycles(userId, schedule.id);
+        results.push({
+          scheduleId: schedule.id,
+          scheduleName: schedule.template.title,
+          cyclesCreated: cycles.length,
+          success: true,
+        });
+      } catch (error) {
+        results.push({
+          scheduleId: schedule.id,
+          cyclesCreated: 0,
+          success: false,
+          error: error.message,
+        });
+      }
     }
 
     return results;

@@ -79,7 +79,7 @@ model Employee {
   active        Boolean    @default(true)
   avatar        String?
   role          String?
-  currentLevel  Int        @default(1) 
+  currentLevel  Int        @default(0) 
   user          User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   branch        Branch?    @relation(fields: [branchId], references: [id])
   department    Department?    @relation(fields: [departmentId], references: [id])
@@ -232,9 +232,10 @@ model TaskTemplate {
   title         String
   description   String?
   scope         TaskScope
+  level         Int         @default(1)
   unit          String?
   defaultTarget Float?
-  aggregation   Aggregation @default(COUNT)
+  aggregation   Aggregation?
   isActive      Boolean     @default(true)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
@@ -297,7 +298,7 @@ model TaskInstance {
   description    String?
   target         Float?
   unit           String?
-  quantity       Float       @default(0)
+  quantity       Float?
   status         TaskStatusV2  @default(PENDING)
   completedAt    DateTime?
   completedBy    String?

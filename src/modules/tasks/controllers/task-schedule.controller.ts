@@ -51,27 +51,25 @@ export class TaskScheduleController {
   }
 
   @Post(':id/generate-cycles')
-  @ApiOperation({ summary: 'Generate cycles for a schedule' })
-  @ApiResponse({ status: 200, description: 'Cycles generated successfully' })
-  @ApiQuery({
-    name: 'upToDate',
-    required: false,
-    description: 'Generate cycles up to this date (ISO format)',
+  @ApiOperation({
+    summary: 'Generate cycles for a schedule',
+    description:
+      'Generate ALL cycles between schedule startDate and endDate. Schedule must have endDate.',
   })
+  @ApiResponse({ status: 200, description: 'Cycles generated successfully' })
+  @ApiResponse({ status: 400, description: 'Schedule must have endDate' })
   generateCycles(@Request() req, @Param('id') id: string) {
     return this.taskScheduleService.generateCycles(req.user.userId, id);
   }
 
   @Post('generate-all-cycles')
-  @ApiOperation({ summary: 'Generate cycles for all active schedules' })
+  @ApiOperation({
+    summary: 'Generate cycles for all active schedules',
+    description: 'Generate cycles for all active schedules that have endDate',
+  })
   @ApiResponse({
     status: 200,
     description: 'Cycles generated for all schedules',
-  })
-  @ApiQuery({
-    name: 'upToDate',
-    required: false,
-    description: 'Generate cycles up to this date (ISO format)',
   })
   generateAllCycles(@Request() req) {
     return this.taskScheduleService.generateAllActiveCycles(req.user.userId);

@@ -29,10 +29,9 @@ export class CreateTaskInstanceDto {
   @IsString()
   employeeId?: string;
 
-  @ApiProperty({ example: 'clxxx123456789', required: false })
-  @ValidateIf((o) => o.scope === TaskScope.DEPARTMENT)
+  @ApiProperty({ example: 'clxxx123456789' })
   @IsString()
-  departmentId?: string;
+  departmentId: string;
 
   @ApiProperty({ example: 1, default: 1 })
   @IsInt()
