@@ -17,6 +17,7 @@ import { PaginationDto } from '../../common/dtos/pagination.dto';
 import { Prisma } from '@prisma/client';
 import { User, JwtPayload } from '../../common/decorators/user.decorator';
 import { QueryShiftSignupEmployeeDto } from 'src/modules/shift-signups/dto/query-shift-signup-employee-dto';
+import { CreateBulkShiftSignupDto } from 'src/modules/shift-signups/dto/create-bulk-shift-signup.dto';
 
 @ApiTags('Shift Signups')
 @Controller('shift-signups')
@@ -45,6 +46,24 @@ export class ShiftSignupsController {
     return this.shiftSignupsService.createByAdmin(
       user.userId,
       createShiftSignupDto,
+    );
+  }
+  @Post('bulk-weekly')
+  @ApiOperation({
+    summary:
+      'Đăng ký nhiều ca cùng lúc cho 1 tuần (từ thứ 2 đến CN) - Employee only',
+    description:
+      'Chỉ cho phép đăng ký trước thứ 2 của tuần đó. Phải đăng ký đầy đủ các ngày trong tuần, nếu vắng ngày nào phải có đơn xin nghỉ được duyệt.',
+  })
+  @ApiResponse({ status: 201, description: 'Đăng ký tuần thành công' })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  async createBulkWeekly(
+    @User() user: JwtPayload,
+    @Body() createBulkShiftSignupDto: CreateBulkShiftSignupDto,
+  ) {
+    return this.shiftSignupsService.createBulkWeekly(
+      user.employeeId,
+      createBulkShiftSignupDto,
     );
   }
 

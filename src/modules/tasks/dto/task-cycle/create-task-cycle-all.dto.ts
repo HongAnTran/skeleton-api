@@ -1,11 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsDateString } from 'class-validator';
+import { IsDateString } from 'class-validator';
 
-export class CreateTaskCycleDto {
-  @ApiProperty({ example: 'clxxx123456789' })
-  @IsString()
-  taskId: string;
-
+export class CreateTaskCycleAllDto {
   @ApiProperty({
     example: '2025-01-01T00:00:00.000Z',
     description: 'Period start date',

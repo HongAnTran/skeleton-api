@@ -7,7 +7,6 @@ import {
   Param,
   Delete,
   Query,
-  UseGuards,
   Request,
 } from '@nestjs/common';
 import {
@@ -20,6 +19,7 @@ import { TaskCycleService } from '../services/task-cycle.service';
 import { CreateTaskCycleDto } from '../dto/task-cycle/create-task-cycle.dto';
 import { UpdateTaskCycleDto } from '../dto/task-cycle/update-task-cycle.dto';
 import { QueryTaskCycleDto } from '../dto/task-cycle/query-task-cycle.dto';
+import { CreateTaskCycleAllDto } from 'src/modules/tasks/dto/task-cycle/create-task-cycle-all.dto';
 
 @ApiTags('Task Cycles')
 @ApiBearerAuth()
@@ -32,6 +32,18 @@ export class TaskCycleController {
   @ApiResponse({ status: 201, description: 'Cycle created successfully' })
   create(@Request() req, @Body() createDto: CreateTaskCycleDto) {
     return this.taskCycleService.create(req.user.userId, createDto);
+  }
+  @Post('all')
+  @ApiOperation({ summary: 'Create many task cycles for all task' })
+  @ApiResponse({ status: 201, description: 'Cycles created successfully' })
+  createManyForAllTask(
+    @Request() req,
+    @Body() createDto: CreateTaskCycleAllDto,
+  ) {
+    return this.taskCycleService.createManyForAllTask(
+      req.user.userId,
+      createDto,
+    );
   }
 
   @Get()
@@ -47,36 +59,6 @@ export class TaskCycleController {
   @ApiResponse({ status: 404, description: 'Cycle not found' })
   findOne(@Request() req, @Param('id') id: string) {
     return this.taskCycleService.findOne(req.user.userId, id);
-  }
-
-  @Get(':id/statistics')
-  @ApiOperation({ summary: 'Get cycle statistics' })
-  @ApiResponse({ status: 200, description: 'Return cycle statistics' })
-  getCycleStatistics(@Request() req, @Param('id') id: string) {
-    return this.taskCycleService.getCycleStatistics(req.user.userId, id);
-  }
-
-  // @Post(':id/generate-instances')
-  // @ApiOperation({ summary: 'Generate task instances for a cycle' })
-  // @ApiResponse({
-  //   status: 200,
-  //   description: 'Instances generated successfully',
-  // })
-  // @ApiResponse({
-  //   status: 400,
-  //   description: 'Instances already exist for this cycle',
-  // })
-  // generateInstances(@Request() req, @Param('id') id: string) {
-  //   return this.taskCycleService.generateInstances(req.user.userId, id);
-  // }
-
-  @Post(':id/update-status')
-  @ApiOperation({
-    summary: 'Update cycle status based on its instances',
-  })
-  @ApiResponse({ status: 200, description: 'Status updated successfully' })
-  updateCycleStatus(@Request() req, @Param('id') id: string) {
-    return this.taskCycleService.updateCycleStatus(req.user.userId, id);
   }
 
   @Patch(':id')

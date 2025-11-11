@@ -1,14 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsEnum, IsOptional } from 'class-validator';
-import { TaskStatusV2 } from '@prisma/client';
+import { IsDateString, IsOptional } from 'class-validator';
 
 export class UpdateTaskCycleDto {
-  @ApiProperty({
-    enum: TaskStatusV2,
-    example: TaskStatusV2.COMPLETED,
-    required: false,
-  })
+  @ApiProperty({ example: '2025-01-01T00:00:00.000Z' })
   @IsOptional()
-  @IsEnum(TaskStatusV2)
-  status?: TaskStatusV2;
+  @IsDateString()
+  periodStart: string;
+
+  @ApiProperty({ example: '2025-01-31T23:59:59.999Z' })
+  @IsOptional()
+  @IsDateString()
+  periodEnd: string;
 }

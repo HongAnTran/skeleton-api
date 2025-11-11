@@ -2,36 +2,19 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../database/database.module';
 
 // Services
-import { TaskTemplateService } from './services/task-template.service';
-import { TaskScheduleService } from './services/task-schedule.service';
 import { TaskCycleService } from './services/task-cycle.service';
-import { TaskInstanceService } from './services/task-instance.service';
+import { TaskService } from './services/task.service';
+import { TaskAssignmentService } from './services/task-assignment.service';
 
 // Controllers
-import { TaskTemplateController } from './controllers/task-template.controller';
-import { TaskScheduleController } from './controllers/task-schedule.controller';
 import { TaskCycleController } from './controllers/task-cycle.controller';
-import { TaskInstanceController } from './controllers/task-instance.controller';
+import { TaskController } from './controllers/task.controller';
+import { TaskAssignmentController } from './controllers/task-assignment.controller';
 
 @Module({
   imports: [DatabaseModule],
-  controllers: [
-    TaskTemplateController,
-    TaskScheduleController,
-    TaskCycleController,
-    TaskInstanceController,
-  ],
-  providers: [
-    TaskTemplateService,
-    TaskScheduleService,
-    TaskCycleService,
-    TaskInstanceService,
-  ],
-  exports: [
-    TaskTemplateService,
-    TaskScheduleService,
-    TaskCycleService,
-    TaskInstanceService,
-  ],
+  controllers: [TaskCycleController, TaskController, TaskAssignmentController],
+  providers: [TaskCycleService, TaskService, TaskAssignmentService],
+  exports: [TaskCycleService, TaskService, TaskAssignmentService],
 })
 export class TasksModule {}

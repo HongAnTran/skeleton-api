@@ -47,7 +47,7 @@ model User {
   departments  Department[]
   shiftSlots   ShiftSlot[]   
   shiftSlotTypes ShiftSlotType[]
-  taskTemplates TaskTemplate[]
+  tasksV2 TaskV2[]
 }
 model Account {
   id                  String   @id @default(cuid()) 
@@ -88,8 +88,10 @@ model Employee {
   updatedAt    DateTime   @updatedAt
   // Shift swap relations
   swapRequestsSent ShiftSwapRequest[] @relation("ShiftSwapRequester")
-  swapRequestsReceived ShiftSwapRequest[] @relation("ShiftSwapTarget") 
-  tasks TaskInstance[]
+  swapRequestsReceived ShiftSwapRequest[] @relation("ShiftSwapTarget")
+  // Task assignments
+  taskAssignments TaskAssignment[]
+  leaveRequests LeaveRequest[]
 }
 
 model Branch {
@@ -114,7 +116,7 @@ model Department {
   createdAt    DateTime   @default(now())
   employees  Employee[]
   shiftSlots ShiftSlot[]
-  tasks TaskInstance[]
+  tasksV2 TaskV2[]
 }
 
 
@@ -205,141 +207,96 @@ enum TaskStatusV2 {
   EXPIRED
 }
 
-enum TaskScope {
-  INDIVIDUAL
-  DEPARTMENT
-}
 
-enum Frequency {
-  NONE
-  DAILY
-  WEEKLY
-  MONTHLY
-  QUARTERLY
-  YEARLY
-}
 
-enum Aggregation {
-  COUNT
-  SUM
-  AVERAGE
-  MAX
-  MIN
-}
-
-model TaskTemplate {
+model TaskV2{
   id            String      @id @default(cuid())
   title         String
   description   String?
-  scope         TaskScope
+  required       Boolean     @default(true) 
   level         Int         @default(1)
-  unit          String?
-  defaultTarget Float?
-  aggregation   Aggregation?
   isActive      Boolean     @default(true)
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
-
-  schedules     TaskSchedule[]
-  instances     TaskInstance[]
+  isTaskTeam Boolean     @default(false)
+  departmentId String
+  department Department @relation(fields: [departmentId], references: [id])
   user          User          @relation(fields: [userId], references: [id], onDelete: Cascade)
   userId        String
+  cycles TaskCycleV2[]
 }
 
-model TaskSchedule {
+
+
+model TaskCycleV2 {
   id           String      @id @default(cuid())
-  templateId   String
-  template     TaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-
-  frequency    Frequency   @default(MONTHLY)
-  interval     Int         @default(1)
-  dayOfMonth   Int?
-  startDate    DateTime
-  endDate      DateTime?
-  createdAt    DateTime    @default(now())
-  updatedAt    DateTime    @updatedAt
-
-  cycles       TaskCycle[]
-}
-
-model TaskCycle {
-  id           String      @id @default(cuid())
-  scheduleId   String
-  schedule     TaskSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
   periodStart  DateTime
   periodEnd    DateTime
-  generatedAt  DateTime    @default(now())
-  status       TaskStatusV2  @default(IN_PROGRESS)
-
-  instances    TaskInstance[]
-
-  @@unique([scheduleId, periodStart, periodEnd])
+  taskId String
+  task TaskV2 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  assignments TaskAssignment[]
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
 }
 
-model TaskInstance {
-  id             String      @id @default(cuid())
-  templateId     String
-  template       TaskTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
-  cycleId        String
-  cycle          TaskCycle    @relation(fields: [cycleId], references: [id], onDelete: Cascade)
-
-  scope          TaskScope
-  employeeId     String?
-  departmentId   String?
-  employee       Employee?   @relation(fields: [employeeId], references: [id])
-  department     Department? @relation(fields: [departmentId], references: [id])
-
-
-
-  level          Int         @default(1)   
-  required       Boolean     @default(true) 
-
-  title          String
-  description    String?
-  target         Float?
-  unit           String?
-  quantity       Float?
-  status         TaskStatusV2  @default(PENDING)
+model TaskAssignment {
+  id           String      @id @default(cuid())
+  
+  cycleId      String
+  cycle        TaskCycleV2 @relation(fields: [cycleId], references: [id], onDelete: Cascade)
+  employeeId   String
+  employee     Employee    @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  status       TaskStatusV2 @default(PENDING)
+  
   completedAt    DateTime?
   completedBy    String?
+  completedNote  String?
+  
+  // Approval tracking
   approvedAt     DateTime?
   approvedBy     String?
   rejectedAt     DateTime?
   rejectedBy     String?
   rejectedReason String?
-
-  createdAt      DateTime    @default(now())
-  updatedAt      DateTime    @updatedAt
-
-  progressEvents TaskProgressEvent[]
-  approvals      TaskApproval[]
-
-  @@index([cycleId, scope, level, status])
+  
+  createdAt    DateTime    @default(now())
+  updatedAt    DateTime    @updatedAt
+  
+  @@unique([cycleId, employeeId])
+  @@index([cycleId])
   @@index([employeeId])
-  @@index([departmentId])
+  @@index([status])
 }
 
-model TaskProgressEvent {
-  id           String       @id @default(cuid())
-  instanceId   String
-  instance     TaskInstance @relation(fields: [instanceId], references: [id], onDelete: Cascade)
-  delta        Float
-  source       String?
-  note         String?
-  occurredAt   DateTime
-  createdAt    DateTime     @default(now())
-  createdBy    String?
 
-  @@index([instanceId, occurredAt])
+enum LeaveRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CANCELLED
 }
 
-model TaskApproval {
-  id           String        @id @default(cuid())
-  instanceId   String
-  instance     TaskInstance  @relation(fields: [instanceId], references: [id], onDelete: Cascade)
-  action       String        
-  reason       String?
-  actedBy      String
-  actedAt      DateTime      @default(now())
+
+model LeaveRequest {
+  id            String              @id @default(cuid())
+  employeeId    String
+  startDate     DateTime
+  endDate       DateTime
+  reason        String?
+  status        LeaveRequestStatus  @default(PENDING)
+  approvedBy    String?
+  approvedAt    DateTime?
+  rejectedBy    String?
+  rejectedAt    DateTime?
+  rejectedReason String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  
+  employee      Employee            @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  
+  @@index([employeeId])
+  @@index([startDate, endDate])
+  @@index([status])
 }
 

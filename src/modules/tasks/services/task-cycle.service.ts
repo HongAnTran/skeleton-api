@@ -7,60 +7,51 @@ import { PrismaService } from '../../../database/prisma.service';
 import { CreateTaskCycleDto } from '../dto/task-cycle/create-task-cycle.dto';
 import { UpdateTaskCycleDto } from '../dto/task-cycle/update-task-cycle.dto';
 import { QueryTaskCycleDto } from '../dto/task-cycle/query-task-cycle.dto';
-import { TaskScope, TaskStatusV2 } from '@prisma/client';
+import { Prisma } from '@prisma/client';
+import { CreateTaskCycleAllDto } from '../dto/task-cycle/create-task-cycle-all.dto';
+import { TaskAssignmentService } from './task-assignment.service';
 
 @Injectable()
 export class TaskCycleService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private taskAssignmentService: TaskAssignmentService,
+  ) {}
 
   async create(userId: string, createDto: CreateTaskCycleDto) {
-    // Verify schedule exists and belongs to user
-    const schedule = await this.prisma.taskSchedule.findFirst({
+    const task = await this.prisma.taskV2.findFirst({
       where: {
-        id: createDto.scheduleId,
-        template: {
-          userId,
-        },
+        id: createDto.taskId,
+        userId,
       },
     });
 
-    if (!schedule) {
-      throw new NotFoundException('TaskSchedule not found');
+    if (!task) {
+      throw new NotFoundException('Task not found');
     }
 
-    const cycle = await this.prisma.taskCycle.create({
+    const cycle = await this.prisma.taskCycleV2.create({
       data: {
         ...createDto,
         periodStart: new Date(createDto.periodStart),
         periodEnd: new Date(createDto.periodEnd),
       },
       include: {
-        schedule: {
-          include: {
-            template: true,
-          },
-        },
+        task: true,
       },
     });
-
     return cycle;
   }
 
   async findAll(userId: string, query: QueryTaskCycleDto) {
-    const where: any = {
-      schedule: {
-        template: {
-          userId,
-        },
+    const where: Prisma.TaskCycleV2WhereInput = {
+      task: {
+        userId,
       },
     };
 
-    if (query.scheduleId) {
-      where.scheduleId = query.scheduleId;
-    }
-
-    if (query.status) {
-      where.status = query.status;
+    if (query.taskId) {
+      where.taskId = query.taskId;
     }
 
     if (query.periodStartFrom || query.periodStartTo) {
@@ -73,19 +64,11 @@ export class TaskCycleService {
       }
     }
 
-    return this.prisma.taskCycle.findMany({
+    return this.prisma.taskCycleV2.findMany({
       where,
       include: {
-        schedule: {
-          include: {
-            template: true,
-          },
-        },
-        _count: {
-          select: {
-            instances: true,
-          },
-        },
+        task: true,
+        assignments: true,
       },
       orderBy: {
         periodStart: 'desc',
@@ -94,30 +77,15 @@ export class TaskCycleService {
   }
 
   async findOne(userId: string, id: string) {
-    const cycle = await this.prisma.taskCycle.findFirst({
+    const cycle = await this.prisma.taskCycleV2.findFirst({
       where: {
         id,
-        schedule: {
-          template: {
-            userId,
-          },
+        task: {
+          userId,
         },
       },
       include: {
-        schedule: {
-          include: {
-            template: true,
-          },
-        },
-        instances: {
-          include: {
-            employee: true,
-            department: true,
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-        },
+        task: true,
       },
     });
 
@@ -129,42 +97,41 @@ export class TaskCycleService {
   }
 
   async update(userId: string, id: string, updateDto: UpdateTaskCycleDto) {
-    const cycle = await this.prisma.taskCycle.findFirst({
+    const cycle = await this.prisma.taskCycleV2.findFirst({
       where: {
         id,
-        schedule: {
-          template: {
-            userId,
-          },
+        task: {
+          userId,
         },
       },
     });
 
     if (!cycle) {
-      throw new NotFoundException(`TaskCycle with ID ${id} not found`);
+      throw new NotFoundException(`Không tìm thấy cycle`);
     }
 
-    return this.prisma.taskCycle.update({
+    return this.prisma.taskCycleV2.update({
       where: { id },
-      data: updateDto,
+      data: {
+        periodStart: updateDto.periodStart
+          ? new Date(updateDto.periodStart)
+          : undefined,
+        periodEnd: updateDto.periodEnd
+          ? new Date(updateDto.periodEnd)
+          : undefined,
+      },
       include: {
-        schedule: {
-          include: {
-            template: true,
-          },
-        },
+        task: true,
       },
     });
   }
 
   async remove(userId: string, id: string) {
-    const cycle = await this.prisma.taskCycle.findFirst({
+    const cycle = await this.prisma.taskCycleV2.findFirst({
       where: {
         id,
-        schedule: {
-          template: {
-            userId,
-          },
+        task: {
+          userId,
         },
       },
     });
@@ -173,231 +140,36 @@ export class TaskCycleService {
       throw new NotFoundException(`TaskCycle with ID ${id} not found`);
     }
 
-    return this.prisma.taskCycle.delete({
+    return this.prisma.taskCycleV2.delete({
       where: { id },
     });
   }
 
-  // /**
-  //  * Generate task instances for a cycle
-  //  * This creates individual or department tasks based on the template scope
-  //  */
-  // async generateInstances(userId: string, cycleId: string) {
-  //   const cycle = await this.prisma.taskCycle.findFirst({
-  //     where: {
-  //       id: cycleId,
-  //       schedule: {
-  //         template: {
-  //           userId,
-  //         },
-  //       },
-  //     },
-  //     include: {
-  //       schedule: {
-  //         include: {
-  //           template: true,
-  //         },
-  //       },
-  //       instances: true,
-  //     },
-  //   });
-
-  //   if (!cycle) {
-  //     throw new NotFoundException(`TaskCycle with ID ${cycleId} not found`);
-  //   }
-
-  //   // Don't generate if instances already exist
-  //   if (cycle.instances.length > 0) {
-  //     throw new BadRequestException('Instances already exist for this cycle');
-  //   }
-
-  //   const template = cycle.schedule.template;
-
-  //   const instancesToCreate = [];
-
-  //   if (template.scope === TaskScope.INDIVIDUAL) {
-  //     // Get all active employees for this user
-  //     const employees = await this.prisma.employee.findMany({
-  //       where: {
-  //         userId,
-  //         active: true,
-  //       },
-  //     });
-
-  //     for (const employee of employees) {
-  //       instancesToCreate.push({
-  //         templateId: template.id,
-  //         cycleId: cycle.id,
-  //         scope: TaskScope.INDIVIDUAL,
-  //         employeeId: employee.id,
-  //         departmentId: null,
-  //         level: 1,
-  //         required: true,
-  //         title: template.title,
-  //         description: template.description,
-  //         target: template.defaultTarget,
-  //         unit: template.unit,
-  //         quantity: 0,
-  //         status: TaskStatusV2.PENDING,
-  //       });
-  //     }
-  //   } else if (template.scope === TaskScope.DEPARTMENT) {
-  //     // Get all departments for this user
-  //     const departments = await this.prisma.department.findMany({
-  //       where: {
-  //         userId,
-  //       },
-  //     });
-
-  //     for (const department of departments) {
-  //       instancesToCreate.push({
-  //         templateId: template.id,
-  //         cycleId: cycle.id,
-  //         scope: TaskScope.DEPARTMENT,
-  //         employeeId: null,
-  //         departmentId: department.id,
-  //         level: 1,
-  //         required: true,
-  //         title: template.title,
-  //         description: template.description,
-  //         target: template.defaultTarget,
-  //         unit: template.unit,
-  //         quantity: 0,
-  //         status: TaskStatusV2.PENDING,
-  //       });
-  //     }
-  //   }
-
-  //   // Create all instances
-  //   const createdInstances = await this.prisma.taskInstance.createMany({
-  //     data: instancesToCreate,
-  //   });
-
-  //   return {
-  //     cycleId: cycle.id,
-  //     instancesCreated: createdInstances.count,
-  //   };
-  // }
-
-  /**
-   * Update cycle status based on its instances
-   */
-  async updateCycleStatus(userId: string, cycleId: string) {
-    const cycle = await this.prisma.taskCycle.findFirst({
+  async createManyForAllTask(userId: string, createDto: CreateTaskCycleAllDto) {
+    const tasks = await this.prisma.taskV2.findMany({
       where: {
-        id: cycleId,
-        schedule: {
-          template: {
-            userId,
-          },
-        },
-      },
-      include: {
-        instances: true,
+        userId,
+        isActive: true,
       },
     });
-
-    if (!cycle) {
-      throw new NotFoundException(`TaskCycle with ID ${cycleId} not found`);
-    }
-
-    if (cycle.instances.length === 0) {
-      return cycle;
-    }
-
-    // Calculate status based on instances
-    const allCompleted = cycle.instances.every(
-      (i) =>
-        i.status === TaskStatusV2.COMPLETED ||
-        i.status === TaskStatusV2.APPROVED,
-    );
-    const anyExpired = cycle.instances.some(
-      (i) => i.status === TaskStatusV2.EXPIRED,
-    );
-
-    let newStatus = cycle.status;
-
-    if (allCompleted) {
-      newStatus = TaskStatusV2.COMPLETED;
-    } else if (anyExpired) {
-      newStatus = TaskStatusV2.EXPIRED;
-    } else if (
-      cycle.instances.some((i) => i.status === TaskStatusV2.IN_PROGRESS)
-    ) {
-      newStatus = TaskStatusV2.IN_PROGRESS;
-    }
-
-    if (newStatus !== cycle.status) {
-      return this.prisma.taskCycle.update({
-        where: { id: cycleId },
-        data: { status: newStatus },
+    const cyclePromises = tasks.map((task) => {
+      return this.prisma.taskCycleV2.create({
+        data: {
+          ...createDto,
+          task: {
+            connect: {
+              id: task.id,
+            },
+          },
+        },
+      });
+    });
+    const cycles = await Promise.all(cyclePromises);
+    for await (const cycle of cycles) {
+      await this.taskAssignmentService.assignEmployeesToCycle(userId, {
+        cycleId: cycle.id,
       });
     }
-
-    return cycle;
-  }
-
-  /**
-   * Get cycle statistics
-   */
-  async getCycleStatistics(userId: string, cycleId: string) {
-    const cycle = await this.prisma.taskCycle.findFirst({
-      where: {
-        id: cycleId,
-        schedule: {
-          template: {
-            userId,
-          },
-        },
-      },
-    });
-
-    if (!cycle) {
-      throw new NotFoundException(`TaskCycle with ID ${cycleId} not found`);
-    }
-
-    const [
-      totalInstances,
-      pendingInstances,
-      inProgressInstances,
-      completedInstances,
-      approvedInstances,
-      rejectedInstances,
-      expiredInstances,
-    ] = await Promise.all([
-      this.prisma.taskInstance.count({ where: { cycleId } }),
-      this.prisma.taskInstance.count({
-        where: { cycleId, status: TaskStatusV2.PENDING },
-      }),
-      this.prisma.taskInstance.count({
-        where: { cycleId, status: TaskStatusV2.IN_PROGRESS },
-      }),
-      this.prisma.taskInstance.count({
-        where: { cycleId, status: TaskStatusV2.COMPLETED },
-      }),
-      this.prisma.taskInstance.count({
-        where: { cycleId, status: TaskStatusV2.APPROVED },
-      }),
-      this.prisma.taskInstance.count({
-        where: { cycleId, status: TaskStatusV2.REJECTED },
-      }),
-      this.prisma.taskInstance.count({
-        where: { cycleId, status: TaskStatusV2.EXPIRED },
-      }),
-    ]);
-
-    return {
-      totalInstances,
-      pendingInstances,
-      inProgressInstances,
-      completedInstances,
-      approvedInstances,
-      rejectedInstances,
-      expiredInstances,
-      completionRate:
-        totalInstances > 0
-          ? ((completedInstances + approvedInstances) / totalInstances) * 100
-          : 0,
-    };
+    return cycles;
   }
 }

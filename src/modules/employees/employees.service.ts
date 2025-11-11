@@ -119,7 +119,6 @@ export class EmployeesService {
             slot: true,
           },
         },
-        tasks: true,
       },
     });
 
@@ -136,7 +135,6 @@ export class EmployeesService {
       include: {
         branch: true,
         shiftSignups: true,
-        tasks: true,
       },
     });
   }
@@ -154,7 +152,6 @@ export class EmployeesService {
           },
         },
         branch: true,
-        tasks: true,
       },
     });
   }

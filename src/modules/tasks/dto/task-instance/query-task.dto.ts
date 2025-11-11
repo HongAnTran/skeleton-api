@@ -1,24 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { IsOptional, IsEnum, IsString, IsInt, Min } from 'class-validator';
-import { TaskScope, TaskStatusV2 } from '@prisma/client';
+import { TaskStatusV2 } from '@prisma/client';
 import { Type } from 'class-transformer';
 
-export class QueryTaskInstanceDto {
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  cycleId?: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  templateId?: string;
-
-  @ApiProperty({ enum: TaskScope, required: false })
-  @IsOptional()
-  @IsEnum(TaskScope)
-  scope?: TaskScope;
-
+export class QueryTaskDto {
   @ApiProperty({ required: false })
   @IsOptional()
   @IsString()

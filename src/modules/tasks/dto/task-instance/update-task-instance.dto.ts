@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsOptional, IsNumber, IsString } from 'class-validator';
+import { IsOptional, IsString } from 'class-validator';
 
 export class UpdateTaskInstanceDto {
   @ApiProperty({ required: false })
@@ -11,19 +11,4 @@ export class UpdateTaskInstanceDto {
   @IsOptional()
   @IsString()
   description?: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsNumber()
-  target?: number;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsString()
-  unit?: string;
-
-  @ApiProperty({ required: false })
-  @IsOptional()
-  @IsNumber()
-  quantity?: number;
 }

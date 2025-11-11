@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateShiftSignupDto } from './dto/create-shift-signup.dto';
-import { Prisma, ShiftSignupStatus } from '@prisma/client';
+import { LeaveRequestStatus, Prisma, ShiftSignupStatus } from '@prisma/client';
 
 @Injectable()
 export class ShiftSignupsService {
@@ -216,6 +216,19 @@ export class ShiftSignupsService {
       throw new BadRequestException('Không thể hủy ca làm việc trong quá khứ');
     }
 
+    // Xác định tuần của ca đó (từ thứ 2 đến CN)
+    const slotDate = new Date(shiftSignup.slot.date);
+    const weekStart = this.getWeekStart(slotDate); // Thứ 2 của tuần đó
+
+    // Kiểm tra deadline: chỉ cho phép hủy trước thứ 2 của tuần đó
+    const currentDate = new Date();
+    if (currentDate >= weekStart) {
+      throw new BadRequestException(
+        `Đã quá hạn hủy ca. Chỉ có thể hủy ca trước thứ 2 của tuần làm việc (${weekStart.toLocaleDateString('vi-VN')}). ` +
+          `Nếu bạn muốn hủy ca sau thời hạn, vui lòng liên hệ quản lý.`,
+      );
+    }
+
     return this.prisma.shiftSignup.update({
       where: { id, employeeId },
       data: {
@@ -313,5 +326,289 @@ export class ShiftSignupsService {
     return this.prisma.shiftSignup.count({
       where,
     });
+  }
+
+  async createBulkWeekly(
+    employeeId: string,
+    createBulkShiftSignupDto: { slotIds: string[] },
+  ) {
+    const { slotIds } = createBulkShiftSignupDto;
+
+    if (!slotIds || slotIds.length === 0) {
+      throw new BadRequestException('Danh sách ca đăng ký không được để trống');
+    }
+
+    // 1. Lấy thông tin tất cả các slot
+    const shiftSlots = await this.prisma.shiftSlot.findMany({
+      where: {
+        id: { in: slotIds },
+      },
+      include: {
+        signups: {
+          where: {
+            status: { not: ShiftSignupStatus.CANCELLED },
+          },
+        },
+        type: true,
+        department: true,
+      },
+    });
+
+    if (shiftSlots.length !== slotIds.length) {
+      throw new NotFoundException('Một hoặc nhiều ca làm việc không tồn tại');
+    }
+
+    // 2. Lấy thông tin nhân viên
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+    });
+
+    if (!employee) {
+      throw new NotFoundException('Nhân viên không tồn tại');
+    }
+
+    const departmentId = employee.departmentId;
+
+    // 3. Kiểm tra tất cả slot cùng department
+    const invalidSlots = shiftSlots.filter(
+      (slot) => slot.departmentId !== departmentId,
+    );
+    if (invalidSlots.length > 0) {
+      throw new BadRequestException(
+        'Bạn không thể đăng ký ca làm việc của phòng khác',
+      );
+    }
+
+    // 4. Xác định tuần làm việc (từ thứ 2 đến CN)
+    const dates = shiftSlots.map((slot) => new Date(slot.date));
+    const minDate = new Date(Math.min(...dates.map((d) => d.getTime())));
+    const maxDate = new Date(Math.max(...dates.map((d) => d.getTime())));
+
+    const weekStart = this.getWeekStart(minDate); // Thứ 2
+    const weekEnd = this.getWeekEnd(minDate); // Chủ nhật
+
+    // 5. Kiểm tra deadline: chỉ cho phép đăng ký trước thứ 2 của tuần đó
+    const currentDate = new Date();
+    if (currentDate >= weekStart) {
+      throw new BadRequestException(
+        `Đã quá hạn đăng ký. Chỉ có thể đăng ký trước thứ 2 của tuần làm việc (${weekStart.toLocaleDateString('vi-VN')})`,
+      );
+    }
+
+    // 6. Kiểm tra tất cả slot phải trong cùng 1 tuần
+    const slotsOutOfWeek = shiftSlots.filter((slot) => {
+      const slotDate = new Date(slot.date);
+      return slotDate < weekStart || slotDate > weekEnd;
+    });
+
+    if (slotsOutOfWeek.length > 0) {
+      throw new BadRequestException(
+        'Tất cả các ca phải trong cùng 1 tuần (từ thứ 2 đến chủ nhật)',
+      );
+    }
+
+    // 7. Lấy tất cả slots có sẵn trong tuần cho department
+    const allWeekSlots = await this.prisma.shiftSlot.findMany({
+      where: {
+        date: {
+          gte: weekStart,
+          lte: weekEnd,
+        },
+        departmentId: departmentId,
+      },
+      select: {
+        id: true,
+        date: true,
+      },
+    });
+
+    // 8. Lấy các đăng ký hiện tại của nhân viên trong tuần
+    const existingSignups = await this.prisma.shiftSignup.findMany({
+      where: {
+        employeeId: employeeId,
+        slot: {
+          date: {
+            gte: weekStart,
+            lte: weekEnd,
+          },
+          departmentId: departmentId,
+        },
+        canceledAt: null,
+      },
+      include: {
+        slot: {
+          select: {
+            date: true,
+          },
+        },
+      },
+    });
+
+    // 9. Lấy đơn xin nghỉ được duyệt trong tuần
+    // NOTE: Cần tạo model LeaveRequest trước
+    const approvedLeaves = await this.prisma.leaveRequest.findMany({
+      where: {
+        employeeId: employeeId,
+        status: {
+          in: [LeaveRequestStatus.APPROVED, LeaveRequestStatus.PENDING],
+        },
+        OR: [
+          {
+            startDate: { lte: weekEnd },
+            endDate: { gte: weekStart },
+          },
+        ],
+      },
+    });
+
+    // 10. Tính các ngày unique trong tuần có slot
+    const uniqueDaysInWeek = new Set(
+      allWeekSlots.map((slot) => this.getDateOnly(slot.date).toISOString()),
+    );
+
+    // 11. Tính các ngày sẽ đăng ký (bao gồm cả đăng ký mới và đăng ký cũ)
+    const signedUpDays = new Set(
+      existingSignups.map((signup) =>
+        this.getDateOnly(signup.slot.date).toISOString(),
+      ),
+    );
+
+    // Thêm các ngày từ đăng ký mới
+    shiftSlots.forEach((slot) => {
+      signedUpDays.add(this.getDateOnly(slot.date).toISOString());
+    });
+
+    // 12. Tính các ngày có đơn nghỉ được duyệt
+    const leaveDays = new Set<string>();
+    approvedLeaves.forEach((leave) => {
+      const start = new Date(leave.startDate);
+      const end = new Date(leave.endDate);
+      let current = new Date(start);
+      while (current <= end) {
+        const dayStr = this.getDateOnly(current).toISOString();
+        if (uniqueDaysInWeek.has(dayStr)) {
+          leaveDays.add(dayStr);
+        }
+        current.setDate(current.getDate() + 1);
+      }
+    });
+
+    // 13. Kiểm tra đầy đủ tuần: từ thứ 2 đến CN
+    const missingDays = Array.from(uniqueDaysInWeek).filter(
+      (day) => !signedUpDays.has(day) && !leaveDays.has(day),
+    );
+
+    if (missingDays.length > 0) {
+      const missingDates = missingDays
+        .map((day) => new Date(day).toLocaleDateString('vi-VN'))
+        .join(', ');
+
+      throw new BadRequestException(
+        `Bạn phải đăng ký đầy đủ các ngày trong tuần (từ thứ 2 đến chủ nhật). ` +
+          `Các ngày còn thiếu: ${missingDates}. ` +
+          `Nếu bạn vắng ngày nào, vui lòng nộp đơn xin nghỉ trước.`,
+      );
+    }
+
+    // 14. Kiểm tra capacity và duplicate
+    const errors: string[] = [];
+    for (const slot of shiftSlots) {
+      // Kiểm tra capacity
+      if (slot.signups.length >= slot.capacity) {
+        errors.push(
+          `Ca ngày ${new Date(slot.date).toLocaleDateString('vi-VN')} đã đầy`,
+        );
+        continue;
+      }
+
+      // Kiểm tra đã đăng ký chưa
+      const alreadySignedUp = existingSignups.some(
+        (signup) => signup.slotId === slot.id,
+      );
+      if (alreadySignedUp) {
+        errors.push(
+          `Bạn đã đăng ký ca ngày ${new Date(slot.date).toLocaleDateString('vi-VN')}`,
+        );
+        continue;
+      }
+
+      // Kiểm tra slot trong quá khứ
+      if (new Date(slot.date) < currentDate) {
+        errors.push(
+          `Không thể đăng ký ca trong quá khứ: ${new Date(slot.date).toLocaleDateString('vi-VN')}`,
+        );
+      }
+    }
+
+    if (errors.length > 0) {
+      throw new BadRequestException(errors.join('; '));
+    }
+
+    // 15. Tạo các đăng ký
+    const signups = await Promise.all(
+      shiftSlots.map(async (slot) => {
+        const hours =
+          slot.type.endDate.getHours() - slot.type.startDate.getHours();
+        const minutes =
+          slot.type.endDate.getMinutes() - slot.type.startDate.getMinutes();
+        const totalMinutes = hours * 60 + minutes;
+        const totalHours = totalMinutes / 60;
+
+        return this.prisma.shiftSignup.create({
+          data: {
+            employeeId: employeeId,
+            slotId: slot.id,
+            status: ShiftSignupStatus.PENDING,
+            totalHours: totalHours,
+          },
+          include: {
+            slot: {
+              include: {
+                type: true,
+                department: true,
+              },
+            },
+          },
+        });
+      }),
+    );
+
+    return {
+      message: 'Đăng ký tuần thành công',
+      data: signups,
+      weekInfo: {
+        weekStart: weekStart.toISOString(),
+        weekEnd: weekEnd.toISOString(),
+        totalDays: uniqueDaysInWeek.size,
+        signedUpDays: signedUpDays.size,
+        leaveDays: leaveDays.size,
+      },
+    };
+  }
+
+  // Helper methods
+  private getWeekStart(date: Date): Date {
+    const d = new Date(date);
+    const day = d.getDay();
+    // Thứ 2 = 1, nếu là CN (0) thì lùi về -6
+    const diff = d.getDate() - day + (day === 0 ? -6 : 1);
+    const weekStart = new Date(d);
+    weekStart.setDate(diff);
+    weekStart.setHours(0, 0, 0, 0);
+    return weekStart;
+  }
+
+  private getWeekEnd(date: Date): Date {
+    const weekStart = this.getWeekStart(date);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 6); // Chủ nhật
+    weekEnd.setHours(23, 59, 59, 999);
+    return weekEnd;
+  }
+
+  private getDateOnly(date: Date): Date {
+    const d = new Date(date);
+    d.setHours(0, 0, 0, 0);
+    return d;
   }
 }
