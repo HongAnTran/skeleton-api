@@ -97,7 +97,14 @@ export class ShiftSignupsService {
 
     const shiftSlot = await this.prisma.shiftSlot.findUnique({
       where: { id: createShiftSignupDto.slotId },
-      include: { signups: true, type: true },
+      include: {
+        signups: {
+          where: {
+            status: ShiftSignupStatus.PENDING,
+          },
+        },
+        type: true,
+      },
     });
 
     const employeeId = createShiftSignupDto.employeeId;
@@ -125,7 +132,7 @@ export class ShiftSignupsService {
     });
 
     if (existingSignup) {
-      throw new BadRequestException('Bạn đã đăng ký ca làm việc này');
+      throw new BadRequestException('đã đăng ký ca làm việc này');
     }
 
     const date = new Date(shiftSlot.date);
@@ -143,7 +150,7 @@ export class ShiftSignupsService {
     const departmentId = employee.departmentId;
     if (departmentId !== shiftSlot.departmentId) {
       throw new BadRequestException(
-        'Bạn không thể đăng ký ca làm việc của phòng khác',
+        'không thể đăng ký ca làm việc của phòng khác',
       );
     }
 
