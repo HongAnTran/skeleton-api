@@ -135,14 +135,6 @@ export class ShiftSignupsService {
       throw new BadRequestException('đã đăng ký ca làm việc này');
     }
 
-    const date = new Date(shiftSlot.date);
-    const currentDate = new Date();
-    if (date < currentDate) {
-      throw new BadRequestException(
-        'Không thể đăng ký ca làm việc trong quá khứ',
-      );
-    }
-
     const employee = await this.prisma.employee.findUnique({
       where: { id: employeeId },
     });
