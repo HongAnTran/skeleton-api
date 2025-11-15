@@ -22,6 +22,7 @@ import { ShiftSignupsModule } from './modules/shift-signups/shift-signups.module
 import { ShiftSwapsModule } from './modules/shift-swaps/shift-swaps.module';
 import { TasksModule } from './modules/tasks/tasks.module';
 import { ReportsModule } from './modules/reports/reports.module';
+import { LeaveRequestsModule } from './modules/leave-requests/leave-requests.module';
 
 import configuration from './config/configuration';
 import appConfig from './config/app.config';
@@ -64,6 +65,7 @@ import { CronModule } from './common/cron/cron.module';
     ShiftSwapsModule,
     TasksModule,
     ReportsModule,
+    LeaveRequestsModule,
     CronModule,
   ],
   controllers: [AppController],
