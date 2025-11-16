@@ -540,6 +540,17 @@ export class ShiftSignupsService {
         continue;
       }
 
+      // kiểm tra có đăng kí vào ngày đã xin off hay chưa
+      const isOff = approvedLeaves.some(
+        (leave) => leave.startDate <= new Date(slot.date) && leave.endDate >= new Date(slot.date),
+      );
+      if (isOff) {
+        errors.push(
+          `Bạn đã xin off ngày ${new Date(slot.date).toLocaleDateString('vi-VN')}`,
+        );
+        continue;
+      }
+
       // Kiểm tra đã đăng ký chưa
       const alreadySignedUp = existingSignups.some(
         (signup) => signup.slotId === slot.id,

@@ -54,21 +54,42 @@ export class LeaveRequestsController {
   @ApiResponse({ status: 200, type: [LeaveRequest] })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'status', required: false, type: String })
+  @ApiQuery({ name: 'startDateFrom', required: false, type: String })
+  @ApiQuery({ name: 'endDateTo', required: false, type: String })
   async findMyRequests(
     @User() user: JwtPayload,
-    @Query() paginationDto: PaginationDto,
+    @Query() paginationDto: QueryLeaveRequestDto,
   ) {
     if (!user.employeeId) {
       throw new BadRequestException(
         'Bạn phải là nhân viên để xem đơn xin nghỉ',
       );
     }
-    const { page, limit } = paginationDto;
+    const { page, limit, status, startDateFrom, endDateTo } = paginationDto;
     const skip = (page - 1) * limit;
 
+    const where: Prisma.LeaveRequestWhereInput = {};
+    if (status) {
+      where.status = status;
+    }
+    if (startDateFrom || endDateTo) {
+      where.OR = [];
+    }
+    if (startDateFrom) {
+      where.OR.push({
+        startDate: { gte: new Date(startDateFrom) },
+      });
+    }
+    if (endDateTo) {
+      where.OR.push({
+        endDate: { lte: new Date(endDateTo) },
+      });
+    }
+
     const [requests, total] = await Promise.all([
-      this.leaveRequestsService.findMyRequests(user.employeeId, skip, limit),
-      this.leaveRequestsService.count({ employeeId: user.employeeId }),
+      this.leaveRequestsService.findMyRequests(user.employeeId, where, skip, limit),
+      this.leaveRequestsService.count(where),
     ]);
 
     return {

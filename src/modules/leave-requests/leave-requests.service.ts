@@ -157,9 +157,14 @@ export class LeaveRequestsService {
     return leaveRequest;
   }
 
-  async findMyRequests(employeeId: string, skip?: number, take?: number) {
+  async findMyRequests(
+    employeeId: string,
+    where: Prisma.LeaveRequestWhereInput,
+    skip?: number,
+    take?: number,
+  ) {
     return this.prisma.leaveRequest.findMany({
-      where: { employeeId },
+      where: { employeeId, ...where },
       skip,
       take,
       orderBy: {
