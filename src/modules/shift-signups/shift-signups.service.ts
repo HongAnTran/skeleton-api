@@ -406,7 +406,7 @@ export class ShiftSignupsService {
       );
     }
 
-    // 7. Lấy tất cả slots có sẵn trong tuần cho department
+    // 7. Lấy tất cả slots có sẵn trong tuần cho department (bao gồm capacity và signups)
     const allWeekSlots = await this.prisma.shiftSlot.findMany({
       where: {
         date: {
@@ -415,9 +415,12 @@ export class ShiftSignupsService {
         },
         departmentId: departmentId,
       },
-      select: {
-        id: true,
-        date: true,
+      include: {
+        signups: {
+          where: {
+            status: { not: ShiftSignupStatus.CANCELLED },
+          },
+        },
       },
     });
 
@@ -460,10 +463,27 @@ export class ShiftSignupsService {
       },
     });
 
-    // 10. Tính các ngày unique trong tuần có slot
-    const uniqueDaysInWeek = new Set(
-      allWeekSlots.map((slot) => this.getDateOnly(slot.date).toISOString()),
-    );
+    // 10. Tính các ngày unique trong tuần có slot CÒN CHỖ (bỏ qua ngày đã full slot)
+    // Nhóm slots theo ngày và kiểm tra xem ngày nào còn ít nhất 1 slot trống
+    const slotsByDay = new Map<string, typeof allWeekSlots>();
+    allWeekSlots.forEach((slot) => {
+      const dayKey = this.getDateOnly(slot.date).toISOString();
+      if (!slotsByDay.has(dayKey)) {
+        slotsByDay.set(dayKey, []);
+      }
+      slotsByDay.get(dayKey)!.push(slot);
+    });
+
+    // Chỉ lấy các ngày có ít nhất 1 slot còn chỗ
+    const uniqueDaysInWeek = new Set<string>();
+    slotsByDay.forEach((slots, dayKey) => {
+      const hasAvailableSlot = slots.some(
+        (slot) => slot.signups.length < slot.capacity,
+      );
+      if (hasAvailableSlot) {
+        uniqueDaysInWeek.add(dayKey);
+      }
+    });
 
     // 11. Tính các ngày sẽ đăng ký (bao gồm cả đăng ký mới và đăng ký cũ)
     const signedUpDays = new Set(
