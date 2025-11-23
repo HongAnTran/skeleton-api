@@ -111,11 +111,12 @@ export class ShiftSignupsController {
   @ApiResponse({ status: 200, type: [ShiftSignup] })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'startDate', required: false, type: String })
   async findSignupsEmployee(
     @User() user: JwtPayload,
     @Query() queryDto: QueryShiftSignupEmployeeDto,
   ) {
-    const { page, limit } = queryDto;
+    const { page, limit, startDate } = queryDto;
     const skip = (page - 1) * limit;
     const employeeId = queryDto.employeeId;
     let signups, total;
@@ -123,6 +124,13 @@ export class ShiftSignupsController {
     const where: Prisma.ShiftSignupWhereInput = {};
     where.employeeId = employeeId;
     where.canceledAt = null;
+    if (startDate) {
+      where.slot = {
+        date: {
+          gte: new Date(startDate),
+        },
+      };
+    }
 
     [signups, total] = await Promise.all([
       this.shiftSignupsService.findAll(where, skip, limit),

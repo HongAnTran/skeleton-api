@@ -174,6 +174,9 @@ export class ShiftSignupsService {
       where,
       skip,
       take,
+      orderBy: {
+        createdAt: 'desc',
+      },
       include: {
         employee: {
           include: {

@@ -88,8 +88,16 @@ export class LeaveRequestsController {
     }
 
     const [requests, total] = await Promise.all([
-      this.leaveRequestsService.findMyRequests(user.employeeId, where, skip, limit),
-      this.leaveRequestsService.count(where),
+      this.leaveRequestsService.findMyRequests(
+        user.employeeId,
+        where,
+        skip,
+        limit,
+      ),
+      this.leaveRequestsService.count({
+        employeeId: user.employeeId,
+        ...where,
+      }),
     ]);
 
     return {
