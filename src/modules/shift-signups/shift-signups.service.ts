@@ -529,26 +529,25 @@ export class ShiftSignupsService {
       );
     }
 
-    // 14. Kiểm tra capacity và duplicate
+    // 14. Kiểm tra capacity và duplicate, lọc bỏ các slot vào ngày đã xin off
     const errors: string[] = [];
-    for (const slot of shiftSlots) {
+    const validSlots = shiftSlots.filter((slot) => {
+      // Bỏ qua slot vào ngày đã xin off (đã được xử lý ở phần 13)
+      const isOff = approvedLeaves.some(
+        (leave) =>
+          leave.startDate <= new Date(slot.date) &&
+          leave.endDate >= new Date(slot.date),
+      );
+      if (isOff) {
+        return false; // Skip slot này
+      }
+
       // Kiểm tra capacity
       if (slot.signups.length >= slot.capacity) {
         errors.push(
           `Ca ngày ${new Date(slot.date).toLocaleDateString('vi-VN')} đã đầy`,
         );
-        continue;
-      }
-
-      // kiểm tra có đăng kí vào ngày đã xin off hay chưa
-      const isOff = approvedLeaves.some(
-        (leave) => leave.startDate <= new Date(slot.date) && leave.endDate >= new Date(slot.date),
-      );
-      if (isOff) {
-        errors.push(
-          `Bạn đã xin off ngày ${new Date(slot.date).toLocaleDateString('vi-VN')}`,
-        );
-        continue;
+        return false;
       }
 
       // Kiểm tra đã đăng ký chưa
@@ -559,7 +558,7 @@ export class ShiftSignupsService {
         errors.push(
           `Bạn đã đăng ký ca ngày ${new Date(slot.date).toLocaleDateString('vi-VN')}`,
         );
-        continue;
+        return false;
       }
 
       // Kiểm tra slot trong quá khứ
@@ -567,16 +566,19 @@ export class ShiftSignupsService {
         errors.push(
           `Không thể đăng ký ca trong quá khứ: ${new Date(slot.date).toLocaleDateString('vi-VN')}`,
         );
+        return false;
       }
-    }
+
+      return true; // Slot hợp lệ
+    });
 
     if (errors.length > 0) {
       throw new BadRequestException(errors.join('; '));
     }
 
-    // 15. Tạo các đăng ký
+    // 15. Tạo các đăng ký (chỉ cho các slot hợp lệ, đã bỏ qua slot vào ngày đã xin off)
     const signups = await Promise.all(
-      shiftSlots.map(async (slot) => {
+      validSlots.map(async (slot) => {
         const hours =
           slot.type.endDate.getHours() - slot.type.startDate.getHours();
         const minutes =
