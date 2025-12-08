@@ -34,4 +34,9 @@ export default () => ({
   health: {
     timeout: parseInt(process.env.HEALTH_CHECK_TIMEOUT, 10) || 5000,
   },
+  kiotviet: {
+    retailer: process.env.KIOTVIET_RETAILER,
+    clientId: process.env.KIOTVIET_CLIENT_ID,
+    clientSecret: process.env.KIOTVIET_CLIENT_SECRET,
+  },
 });

@@ -78,6 +78,18 @@ class EnvironmentVariables {
   @IsNumber()
   @IsOptional()
   HEALTH_CHECK_TIMEOUT: number = 5000;
+
+  @IsString()
+  @IsOptional()
+  KIOTVIET_RETAILER: string;
+
+  @IsString()
+  @IsOptional()
+  KIOTVIET_CLIENT_ID: string;
+
+  @IsString()
+  @IsOptional()
+  KIOTVIET_CLIENT_SECRET: string;
 }
 
 export function validate(config: Record<string, unknown>) {
