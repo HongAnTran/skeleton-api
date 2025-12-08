@@ -1,24 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, ValidateIf } from 'class-validator';
+import { IsString, IsNotEmpty } from 'class-validator';
 
 export class SearchInvoiceDto {
   @ApiProperty({
-    description: 'Số điện thoại khách hàng',
+    description: 'Số điện thoại khách hàng hoặc Serial/IMEI sản phẩm',
     example: '0912345678',
-    required: false,
   })
-  @IsOptional()
   @IsString()
-  @ValidateIf((o) => !o.orderCode && !o.serial)
-  phone?: string;
-
-  @ApiProperty({
-    description: 'Serial/IMEI sản phẩm',
-    example: 'IMEI123456789',
-    required: false,
-  })
-  @IsOptional()
-  @IsString()
-  @ValidateIf((o) => !o.phone && !o.orderCode)
-  serial?: string;
+  @IsNotEmpty()
+  phoneOrSerial: string;
 }

@@ -84,7 +84,18 @@ export class KiotVietService {
   }
 
   /**
-   * Tìm hóa đơn theo số điện thoại, mã đơn hàng hoặc serial/IMEI
+   * Kiểm tra xem input có phải là số điện thoại không
+   */
+  private isPhoneNumber(input: string): boolean {
+    // Loại bỏ khoảng trắng và ký tự đặc biệt
+    const cleaned = input.replace(/[\s\-\(\)]/g, '');
+    // Kiểm tra nếu chỉ chứa số và có độ dài từ 9-11 ký tự
+    return /^\d{9,11}$/.test(cleaned);
+  }
+
+  /**
+   * Tìm hóa đơn theo số điện thoại hoặc serial/IMEI
+   * Tự động nhận diện loại input và tìm kiếm tương ứng
    */
   async searchInvoices(
     searchDto: SearchInvoiceDto,
@@ -96,6 +107,13 @@ export class KiotVietService {
       );
     }
 
+    if (!searchDto.phoneOrSerial || !searchDto.phoneOrSerial.trim()) {
+      throw new HttpException(
+        'Vui lòng cung cấp số điện thoại hoặc serial/IMEI',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
     try {
       const token = await this.getAccessToken();
       const headers = {
@@ -103,20 +121,31 @@ export class KiotVietService {
         Authorization: `Bearer ${token}`,
       };
 
+      const searchValue = searchDto.phoneOrSerial.trim();
       let invoices: InvoiceResponseDto[] = [];
 
-      // Tìm theo số điện thoại
-      if (searchDto.phone) {
-        invoices = await this.searchInvoicesByPhone(searchDto.phone, headers);
-      }
-      // Tìm theo serial/IMEI
-      else if (searchDto.serial) {
-        invoices = await this.searchInvoicesBySerial(searchDto.serial, headers);
+      // Tự động nhận diện loại input
+      if (this.isPhoneNumber(searchValue)) {
+        // Tìm theo số điện thoại
+        this.logger.log(`Searching by phone: ${searchValue}`);
+        invoices = await this.searchInvoicesByPhone(searchValue, headers);
       } else {
-        throw new HttpException(
-          'Vui lòng cung cấp số điện thoại, mã đơn hàng hoặc serial/IMEI',
-          HttpStatus.BAD_REQUEST,
-        );
+        // Tìm theo serial/IMEI
+        this.logger.log(`Searching by serial: ${searchValue}`);
+        invoices = await this.searchInvoicesBySerial(searchValue, headers);
+      }
+
+      // Nếu không tìm thấy kết quả, thử tìm theo cách còn lại
+      if (invoices.length === 0) {
+        if (this.isPhoneNumber(searchValue)) {
+          // Đã tìm theo phone, thử tìm theo serial
+          this.logger.log(`No results by phone, trying serial: ${searchValue}`);
+          invoices = await this.searchInvoicesBySerial(searchValue, headers);
+        } else {
+          // Đã tìm theo serial, thử tìm theo phone
+          this.logger.log(`No results by serial, trying phone: ${searchValue}`);
+          invoices = await this.searchInvoicesByPhone(searchValue, headers);
+        }
       }
 
       // Tính toán thông tin bảo hành cho mỗi hóa đơn
@@ -147,13 +176,12 @@ export class KiotVietService {
         this.httpService.get(`${this.baseUrl}/customers`, {
           headers,
           params: {
-            searchMethod: 'Contains',
             includeRemoveIds: false,
             pageSize: 100,
             currentItem: 0,
             orderBy: 'CreatedDate',
             orderDirection: 'Desc',
-            searchText: phone,
+            contactNumber: phone,
           },
         }),
       );
