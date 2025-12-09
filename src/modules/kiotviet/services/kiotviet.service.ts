@@ -207,6 +207,7 @@ export class KiotVietService {
               orderBy: 'CreatedDate',
               orderDirection: 'Desc',
               customerIds: customerIds,
+              status: [1],
             },
           },
         ),
@@ -240,34 +241,13 @@ export class KiotVietService {
               orderBy: 'CreatedDate',
               orderDirection: 'Desc',
               searchText: serial,
+              status: [1],
             },
           },
         ),
       );
 
       let allInvoices = response.data?.data || [];
-
-      // Nếu không tìm thấy bằng searchText, lọc thủ công trong invoiceDetails
-      if (allInvoices.length === 0) {
-        // Lấy danh sách hóa đơn gần nhất để tìm kiếm
-        const allInvoicesResponse = await firstValueFrom(
-          this.httpService.get<KiotVietInvoiceResponse>(
-            `${this.baseUrl}/invoices`,
-            {
-              headers,
-              params: {
-                includeRemoveIds: false,
-                pageSize: 500, // Tăng số lượng để tìm trong nhiều hóa đơn hơn
-                currentItem: 0,
-                orderBy: 'CreatedDate',
-                orderDirection: 'Desc',
-              },
-            },
-          ),
-        );
-
-        allInvoices = allInvoicesResponse.data?.data || [];
-      }
 
       // Lọc các hóa đơn có chứa serial trong invoiceDetails
       const filteredInvoices = allInvoices.filter((invoice: any) => {
