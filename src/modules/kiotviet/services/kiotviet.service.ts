@@ -135,21 +135,10 @@ export class KiotVietService {
         invoices = await this.searchInvoicesBySerial(searchValue, headers);
       }
 
-      // Nếu không tìm thấy kết quả, thử tìm theo cách còn lại
-      if (invoices.length === 0) {
-        if (this.isPhoneNumber(searchValue)) {
-          // Đã tìm theo phone, thử tìm theo serial
-          this.logger.log(`No results by phone, trying serial: ${searchValue}`);
-          invoices = await this.searchInvoicesBySerial(searchValue, headers);
-        } else {
-          // Đã tìm theo serial, thử tìm theo phone
-          this.logger.log(`No results by serial, trying phone: ${searchValue}`);
-          invoices = await this.searchInvoicesByPhone(searchValue, headers);
-        }
-      }
-
       // Tính toán thông tin bảo hành cho mỗi hóa đơn
-      return invoices.map((invoice) => this.calculateWarranty(invoice));
+      return invoices
+        .map((invoice) => this.calculateWarranty(invoice))
+        .filter((invoice) => invoice !== null);
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -182,6 +171,7 @@ export class KiotVietService {
             orderBy: 'CreatedDate',
             orderDirection: 'Desc',
             contactNumber: phone,
+            status: [1],
           },
         }),
       );
@@ -342,10 +332,7 @@ export class KiotVietService {
 
     // Nếu không tìm thấy sản phẩm bảo hành hoặc bảo hành = 0 ngày, chỉ lọc invoiceDetails
     if (warrantyDays === 0) {
-      return {
-        ...invoice,
-        invoiceDetails: filteredInvoiceDetails,
-      };
+      return null;
     }
 
     // Tính toán thông tin bảo hành
