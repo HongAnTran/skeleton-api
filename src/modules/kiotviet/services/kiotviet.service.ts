@@ -136,9 +136,7 @@ export class KiotVietService {
       }
 
       // Tính toán thông tin bảo hành cho mỗi hóa đơn
-      return invoices
-        .map((invoice) => this.calculateWarranty(invoice))
-        .filter((invoice) => invoice !== null);
+      return invoices.map((invoice) => this.calculateWarranty(invoice));
     } catch (error) {
       if (error instanceof HttpException) {
         throw error;
@@ -327,7 +325,10 @@ export class KiotVietService {
 
     // Nếu không tìm thấy sản phẩm bảo hành hoặc bảo hành = 0 ngày, chỉ lọc invoiceDetails
     if (warrantyDays === 0) {
-      return null;
+      return {
+        ...invoice,
+        invoiceDetails: filteredInvoiceDetails,
+      };
     }
 
     // Tính toán thông tin bảo hành
