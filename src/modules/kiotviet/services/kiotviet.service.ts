@@ -171,7 +171,6 @@ export class KiotVietService {
             orderBy: 'CreatedDate',
             orderDirection: 'Desc',
             contactNumber: phone,
-            status: [1],
           },
         }),
       );
@@ -191,11 +190,9 @@ export class KiotVietService {
           {
             headers,
             params: {
-              includeRemoveIds: false,
+              format: 'json',
               pageSize: 100,
               currentItem: 0,
-              orderBy: 'CreatedDate',
-              orderDirection: 'Desc',
               customerIds: customerIds,
               status: [1],
             },
@@ -225,11 +222,9 @@ export class KiotVietService {
           {
             headers,
             params: {
-              includeRemoveIds: false,
+              format: 'json',
               pageSize: 100,
               currentItem: 0,
-              orderBy: 'CreatedDate',
-              orderDirection: 'Desc',
               searchText: serial,
               status: [1],
             },
