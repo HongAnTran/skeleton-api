@@ -503,8 +503,8 @@ export class ShiftSignupsService {
     // 12. Tính các ngày có đơn nghỉ được duyệt
     const leaveDays = new Set<string>();
     approvedLeaves.forEach((leave) => {
-      const start = new Date(leave.startDate);
-      const end = new Date(leave.endDate);
+      const start = this.getDateOnly(new Date(leave.startDate));
+      const end = this.getDateOnly(new Date(leave.endDate));
       let current = new Date(start);
       while (current <= end) {
         const dayStr = this.getDateOnly(current).toISOString();
