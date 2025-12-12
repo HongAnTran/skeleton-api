@@ -455,7 +455,7 @@ export class ShiftSignupsService {
       where: {
         employeeId: employeeId,
         status: {
-          in: [LeaveRequestStatus.APPROVED, LeaveRequestStatus.PENDING],
+          in: [LeaveRequestStatus.APPROVED],
         },
         OR: [
           {
@@ -519,16 +519,14 @@ export class ShiftSignupsService {
     const missingDays = Array.from(uniqueDaysInWeek).filter(
       (day) => !signedUpDays.has(day) && !leaveDays.has(day),
     );
+    console.log(missingDays);
+    console.log(signedUpDays);
+    console.log(leaveDays);
+    console.log(uniqueDaysInWeek);
 
     if (missingDays.length > 0) {
-      const missingDates = missingDays
-        .map((day) => new Date(day).toLocaleDateString('vi-VN'))
-        .join(', ');
-
       throw new BadRequestException(
-        `Bạn phải đăng ký đầy đủ các ngày trong tuần (từ thứ 2 đến chủ nhật). ` +
-          `Các ngày còn thiếu: ${missingDates}. ` +
-          `Nếu bạn vắng ngày nào, vui lòng nộp đơn xin nghỉ trước.`,
+        `Bạn phải đăng ký đầy đủ các ngày. Nếu bạn vắng ngày nào, vui lòng nộp đơn xin nghỉ trước và phải được duyệt. `,
       );
     }
 
