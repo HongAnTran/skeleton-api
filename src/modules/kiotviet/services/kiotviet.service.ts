@@ -17,6 +17,34 @@ interface KiotVietInvoiceResponse {
   total: number;
 }
 
+interface GoogleScriptInvoiceResponse {
+  id: number | null;
+  code: string | null;
+  createdDate: string;
+  total: number;
+  totalPayment: number;
+  status: number | null;
+  customer: {
+    name: string;
+    phone: string;
+    address?: string;
+  };
+  invoiceDetails: Array<{
+    productName: string;
+    productGroup?: string;
+    brand?: string;
+    serialOrSku: string;
+    quantity: number;
+    price: number;
+    total: number;
+  }>;
+  note?: string;
+  warranty?: {
+    packageName: string;
+    date: string;
+  };
+}
+
 @Injectable()
 export class KiotVietService {
   private readonly logger = new Logger(KiotVietService.name);
@@ -96,6 +124,7 @@ export class KiotVietService {
   /**
    * Tìm hóa đơn theo số điện thoại hoặc serial/IMEI
    * Tự động nhận diện loại input và tìm kiếm tương ứng
+   * Nếu không tìm thấy từ KiotViet, sẽ tìm trong Google Apps Script
    */
   async searchInvoices(
     searchDto: SearchInvoiceDto,
@@ -133,6 +162,16 @@ export class KiotVietService {
         // Tìm theo serial/IMEI
         this.logger.log(`Searching by serial: ${searchValue}`);
         invoices = await this.searchInvoicesBySerial(searchValue, headers);
+      }
+
+      // Nếu không tìm thấy từ KiotViet, tìm trong Google Apps Script
+      if (invoices.length === 0) {
+        this.logger.log(
+          `No invoices found in KiotViet, searching in Google Apps Script`,
+        );
+        const googleScriptInvoices =
+          await this.searchInvoicesFromGoogleScript(searchValue);
+        return googleScriptInvoices;
       }
 
       // Tính toán thông tin bảo hành cho mỗi hóa đơn
@@ -262,6 +301,116 @@ export class KiotVietService {
       this.logger.error('Failed to search invoices by serial', error);
       throw error;
     }
+  }
+
+  /**
+   * Tìm hóa đơn từ Google Apps Script
+   */
+  private async searchInvoicesFromGoogleScript(
+    phoneOrSerial: string,
+  ): Promise<InvoiceResponseDto[]> {
+    try {
+      const googleScriptUrl =
+        'https://script.google.com/macros/s/AKfycbzL-UWgvfzNM6F5gZ0-4E6mmjSFFWPZxu4NzHlD410wTj533yScbH4l6W5IFEEZv0Y/exec';
+
+      const response = await firstValueFrom(
+        this.httpService.get<GoogleScriptInvoiceResponse>(googleScriptUrl, {
+          params: {
+            phoneOrSerial: phoneOrSerial,
+          },
+        }),
+      );
+
+      // Kiểm tra nếu có lỗi hoặc không có dữ liệu
+      if (!response.data || (response.data as any).error) {
+        return [];
+      }
+
+      // Map response sang InvoiceResponseDto
+      const invoice = this.mapGoogleScriptResponseToInvoiceDto(response.data);
+      return invoice ? [invoice] : [];
+    } catch (error) {
+      this.logger.error(
+        'Failed to search invoices from Google Apps Script',
+        error,
+      );
+      // Không throw error, chỉ log và trả về mảng rỗng
+      return [];
+    }
+  }
+
+  /**
+   * Map response từ Google Apps Script sang InvoiceResponseDto
+   */
+  private mapGoogleScriptResponseToInvoiceDto(
+    data: GoogleScriptInvoiceResponse,
+  ): InvoiceResponseDto | null {
+    if (!data || !data.customer || !data.invoiceDetails) {
+      return null;
+    }
+
+    // Map invoiceDetails
+    const invoiceDetails = data.invoiceDetails.map((detail) => ({
+      productId: 0, // Google Script không có productId
+      productName: detail.productName || '',
+      productCode: detail.serialOrSku || '',
+      quantity: detail.quantity || 1,
+      price: detail.price || 0,
+      subTotal: detail.total || 0,
+      serialNumbers: detail.serialOrSku ? [detail.serialOrSku] : [],
+    }));
+
+    // Map customer
+    const customer = {
+      id: 0, // Google Script không có customer id
+      name: data.customer.name || '',
+      contactNumber: data.customer.phone || '',
+      email: undefined,
+    };
+
+    // Map warranty nếu có
+    let warranty: WarrantyInfoDto | undefined;
+    if (data.warranty && data.warranty.packageName && data.warranty.date) {
+      const warrantyDays = parseInt(data.warranty.date, 10) || 0;
+      const purchaseDate = new Date(data.createdDate);
+      const warrantyStartDate = new Date(purchaseDate);
+      warrantyStartDate.setHours(0, 0, 0, 0);
+
+      const warrantyEndDate = new Date(warrantyStartDate);
+      warrantyEndDate.setDate(warrantyEndDate.getDate() + warrantyDays);
+
+      const now = new Date();
+      now.setHours(0, 0, 0, 0);
+
+      const remainingDays = Math.max(
+        0,
+        Math.ceil(
+          (warrantyEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        ),
+      );
+
+      warranty = {
+        warrantyDays,
+        warrantyStartDate: warrantyStartDate.toISOString(),
+        warrantyEndDate: warrantyEndDate.toISOString(),
+        remainingDays,
+        warrantyType: data.warranty.packageName,
+        status: remainingDays > 0 ? 'Còn hiệu lực' : 'Hết hạn',
+      };
+    }
+
+    return {
+      id: data.id || 0,
+      code: data.code || '',
+      createdDate: data.createdDate,
+      total: data.total || 0,
+      totalPayment: data.totalPayment || 0,
+      status: data.status || undefined,
+      customer,
+      invoiceDetails,
+      note: data.note,
+      warranty,
+    };
   }
 
   /**
