@@ -61,7 +61,11 @@ export class InvoiceResponseDto {
     description: 'Thông tin khách hàng',
     type: InvoiceCustomerDto,
   })
-  customer: InvoiceCustomerDto;
+  customerId: number;
+  @ApiProperty({ description: 'Mã khách hàng' })
+  customerCode: string;
+  @ApiProperty({ description: 'Tên khách hàng' })
+  customerName: string;
 
   @ApiProperty({
     description: 'Danh sách sản phẩm',
