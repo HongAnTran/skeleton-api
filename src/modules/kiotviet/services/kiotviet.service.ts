@@ -164,14 +164,15 @@ export class KiotVietService {
         invoices = await this.searchInvoicesBySerial(searchValue, headers);
       }
 
-      // Nếu không tìm thấy từ KiotViet, tìm trong Google Apps Script
-      if (invoices.length === 0) {
-        this.logger.log(
-          `No invoices found in KiotViet, searching in Google Apps Script`,
-        );
-        const googleScriptInvoices =
-          await this.searchInvoicesFromGoogleScript(searchValue);
-        return googleScriptInvoices;
+      try {
+        // Nếu không tìm thấy từ KiotViet, tìm trong Google Apps Script
+        if (invoices.length === 0) {
+          const googleScriptInvoices =
+            await this.searchInvoicesFromGoogleScript(searchValue);
+          return googleScriptInvoices;
+        }
+      } catch (error) {
+        return [];
       }
 
       // Tính toán thông tin bảo hành cho mỗi hóa đơn
@@ -311,7 +312,7 @@ export class KiotVietService {
   ): Promise<InvoiceResponseDto[]> {
     try {
       const googleScriptUrl =
-        'https://script.google.com/macros/s/AKfycbzL-UWgvfzNM6F5gZ0-4E6mmjSFFWPZxu4NzHlD410wTj533yScbH4l6W5IFEEZv0Y/exec';
+        'https://script.google.com/macros/s/AKfycbxccioFGEPfzL0yRc51iokwjr0NeizWn3VOLDGlfRt8KV4-UVLqm0oZPLJGWn4j_XBN/exec';
 
       const response = await firstValueFrom(
         this.httpService.get<GoogleScriptInvoiceResponse>(googleScriptUrl, {

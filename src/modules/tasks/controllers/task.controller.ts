@@ -3,12 +3,11 @@ import {
   Get,
   Post,
   Body,
-  Patch,
   Param,
   Delete,
   Query,
-  UseGuards,
   Request,
+  Put,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -58,7 +57,7 @@ export class TaskController {
     return this.taskService.findOne(req.user.userId, id);
   }
 
-  @Patch(':id')
+  @Put(':id')
   @ApiOperation({ summary: 'Update task instance' })
   @ApiResponse({ status: 200, description: 'Instance updated successfully' })
   @ApiResponse({ status: 404, description: 'Instance not found' })
