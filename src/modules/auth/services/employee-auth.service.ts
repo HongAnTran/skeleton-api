@@ -11,6 +11,7 @@ import { PrismaService } from '../../../database/prisma.service';
 import { LoginDto } from '../dto/login.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
+import { ChangePasswordDto } from '../dto/change-password.dto';
 
 @Injectable()
 export class EmployeeAuthService {
@@ -144,6 +145,43 @@ export class EmployeeAuthService {
       data: { refreshToken: null },
     });
     return { message: 'Employee logged out successfully' };
+  }
+
+  async changePassword(
+    accountId: string,
+    changePasswordDto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    const { oldPassword, newPassword } = changePasswordDto;
+
+    const account = await this.prisma.account.findUnique({
+      where: { id: accountId },
+      include: { employee: true },
+    });
+
+    if (!account || !account.passwordHash || account.role !== 'EMPLOYEE') {
+      throw new ForbiddenException('Tài khoản không hợp lệ');
+    }
+
+    if (!account.employee || !account.employee.active) {
+      throw new ForbiddenException('Tài khoản nhân viên đã bị vô hiệu hóa');
+    }
+
+    const isOldPasswordValid = await bcrypt.compare(
+      oldPassword,
+      account.passwordHash,
+    );
+    if (!isOldPasswordValid) {
+      throw new ForbiddenException('Mật khẩu cũ không đúng');
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.account.update({
+      where: { id: accountId },
+      data: { passwordHash: newPasswordHash },
+    });
+
+    return { message: 'Đổi mật khẩu thành công' };
   }
 
   private async generateTokens({

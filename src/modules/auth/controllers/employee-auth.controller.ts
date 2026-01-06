@@ -19,6 +19,7 @@ import { EmployeeAuthService } from '../services/employee-auth.service';
 import { LoginDto } from '../dto/login.dto';
 import { RefreshTokenDto } from '../dto/refresh-token.dto';
 import { AuthResponseDto } from '../dto/auth-response.dto';
+import { ChangePasswordDto } from '../dto/change-password.dto';
 import { Public } from '../../../common/decorators/public.decorator';
 import { JwtAuthGuard } from '../../../common/guards/jwt-auth.guard';
 import { EmployeeData } from 'src/modules/auth/dto/current-user-response.dto';
@@ -70,5 +71,30 @@ export class EmployeeAuthController {
       req.user.employeeId,
     );
     return employee;
+  }
+
+  @ApiBearerAuth()
+  @UseGuards(JwtAuthGuard)
+  @Post('change-password')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Change employee password' })
+  @ApiResponse({
+    status: 200,
+    description: 'Password changed successfully',
+    schema: {
+      type: 'object',
+      properties: {
+        message: { type: 'string', example: 'Đổi mật khẩu thành công' },
+      },
+    },
+  })
+  async changePassword(
+    @Request() req: any,
+    @Body() changePasswordDto: ChangePasswordDto,
+  ) {
+    return this.employeeAuthService.changePassword(
+      req.user.accountId,
+      changePasswordDto,
+    );
   }
 }
