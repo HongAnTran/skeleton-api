@@ -3,13 +3,22 @@ import { PrismaService } from '../../database/prisma.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { PasswordUtil } from 'src/common/utils/password.util';
+import { AccountRole } from '@prisma/client';
 
 @Injectable()
 export class UsersService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Tạo user mới với account role USER
+   * Chỉ có thể tạo user với role USER, không thể thay đổi role khi tạo
+   */
   async create(createUserDto: CreateUserDto) {
     const { password, provider, email, username, ...userData } = createUserDto;
+    
+    // Đảm bảo role luôn là USER, không thể thay đổi
+    const accountRole: AccountRole = AccountRole.USER;
+    
     return this.prisma.user.create({
       data: {
         name: userData.name,
@@ -20,7 +29,7 @@ export class UsersService {
             provider: provider || 'local',
             email: email,
             username: username,
-            role: 'USER',
+            role: accountRole, // Luôn là USER, không thể thay đổi
           },
         },
       },
