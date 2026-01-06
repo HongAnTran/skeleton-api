@@ -15,10 +15,10 @@ export class UsersService {
    */
   async create(createUserDto: CreateUserDto) {
     const { password, provider, email, username, ...userData } = createUserDto;
-    
+
     // Đảm bảo role luôn là USER, không thể thay đổi
     const accountRole: AccountRole = AccountRole.USER;
-    
+
     return this.prisma.user.create({
       data: {
         name: userData.name,
@@ -45,6 +45,11 @@ export class UsersService {
     return this.prisma.user.findMany({
       skip,
       take,
+      where: {
+        account: {
+          role: AccountRole.USER,
+        },
+      },
       include: {
         employees: true,
         branches: true,
@@ -55,7 +60,12 @@ export class UsersService {
 
   async findOne(id: string) {
     const user = await this.prisma.user.findUnique({
-      where: { id },
+      where: {
+        id,
+        account: {
+          role: AccountRole.USER,
+        },
+      },
       include: {
         employees: true,
         branches: true,
@@ -81,7 +91,7 @@ export class UsersService {
   async update(id: string, updateUserDto: UpdateUserDto) {
     try {
       return await this.prisma.user.update({
-        where: { id },
+        where: { id, account: { role: AccountRole.USER } },
         data: updateUserDto,
         include: {
           employees: true,
@@ -97,7 +107,7 @@ export class UsersService {
   async remove(id: string) {
     try {
       return await this.prisma.user.delete({
-        where: { id },
+        where: { id, account: { role: AccountRole.USER } },
       });
     } catch (error) {
       throw new NotFoundException(`User with ID ${id} not found`);
