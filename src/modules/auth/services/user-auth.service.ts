@@ -108,21 +108,21 @@ export class UserAuthService {
   }
 
   async changePassword(
-    accountId: string,
+    userId: string,
     changePasswordDto: ChangePasswordDto,
   ): Promise<{ message: string }> {
     const { oldPassword, newPassword } = changePasswordDto;
 
-    const account = await this.prisma.account.findUnique({
-      where: { id: accountId },
-      include: { user: true },
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      include: { account: true },
     });
 
-    if (!account || !account.passwordHash || account.role !== 'USER') {
-      throw new ForbiddenException('Tài khoản không hợp lệ');
-    }
+    const account = await this.prisma.account.findUnique({
+      where: { id: user.account.id },
+    });
 
-    if (!account.user) {
+    if (!user || !user.account || !user.account.passwordHash) {
       throw new ForbiddenException('Tài khoản không hợp lệ');
     }
 
@@ -137,7 +137,7 @@ export class UserAuthService {
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
     await this.prisma.account.update({
-      where: { id: accountId },
+      where: { id: account.id },
       data: { passwordHash: newPasswordHash },
     });
 

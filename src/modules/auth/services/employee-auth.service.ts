@@ -148,23 +148,27 @@ export class EmployeeAuthService {
   }
 
   async changePassword(
-    accountId: string,
+    employeeId: string,
     changePasswordDto: ChangePasswordDto,
   ): Promise<{ message: string }> {
     const { oldPassword, newPassword } = changePasswordDto;
 
-    const account = await this.prisma.account.findUnique({
-      where: { id: accountId },
-      include: { employee: true },
+    const employee = await this.prisma.employee.findUnique({
+      where: { id: employeeId },
+      include: { account: true },
     });
 
-    if (!account || !account.passwordHash || account.role !== 'EMPLOYEE') {
+    if (!employee || !employee.account || !employee.account.passwordHash) {
       throw new ForbiddenException('Tài khoản không hợp lệ');
     }
 
-    if (!account.employee || !account.employee.active) {
+    if (!employee.active) {
       throw new ForbiddenException('Tài khoản nhân viên đã bị vô hiệu hóa');
     }
+
+    const account = await this.prisma.account.findUnique({
+      where: { id: employee.account.id },
+    });
 
     const isOldPasswordValid = await bcrypt.compare(
       oldPassword,
@@ -177,7 +181,7 @@ export class EmployeeAuthService {
     const newPasswordHash = await bcrypt.hash(newPassword, 10);
 
     await this.prisma.account.update({
-      where: { id: accountId },
+      where: { id: account.id },
       data: { passwordHash: newPasswordHash },
     });
 

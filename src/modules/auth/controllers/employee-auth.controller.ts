@@ -93,7 +93,7 @@ export class EmployeeAuthController {
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
     return this.employeeAuthService.changePassword(
-      req.user.accountId,
+      req.user.employeeId,
       changePasswordDto,
     );
   }
