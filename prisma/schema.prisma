@@ -48,6 +48,7 @@ model User {
   shiftSlots   ShiftSlot[]   
   shiftSlotTypes ShiftSlotType[]
   tasksV2 TaskV2[]
+  admins       UserAdmin[] @relation("UserAdmins")
 }
 model Account {
   id                  String   @id @default(cuid()) 
@@ -61,11 +62,30 @@ model Account {
   role                AccountRole 
   user                User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   employee            Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+  admin               UserAdmin? @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  adminId             String?     @unique
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   @@index([userId])
   @@index([employeeId])
-  @@unique([userId, employeeId])
+  @@index([adminId])
+  @@unique([userId, employeeId, adminId])
+}
+
+
+model UserAdmin {
+  id            String   @id @default(cuid())
+  userId        String   // User được quản lý
+  adminAccountId String  // Account của quản trị viên
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  user          User     @relation("UserAdmins", fields: [userId], references: [id], onDelete: Cascade)
+  adminAccount  Account  @relation("AdminAccounts", fields: [adminAccountId], references: [id], onDelete: Cascade)
+  
+  @@unique([userId, adminAccountId])
+  @@index([userId])
+  @@index([adminAccountId])
 }
 
 model Employee {
