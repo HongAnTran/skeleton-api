@@ -73,7 +73,13 @@ export class UserAuthService {
       throw new ForbiddenException('Access Denied - Invalid user');
     }
 
-    return user;
+    return {
+      id: user.id,
+      email: user.account.email,
+      name: user.name,
+      phone: user.phone,
+      role: user.account.role,
+    };
   }
 
   async getCurrentAdmin(adminId: string) {
@@ -87,7 +93,13 @@ export class UserAuthService {
     if (!admin) {
       throw new ForbiddenException('Access Denied - Invalid admin');
     }
-    return admin;
+    return {
+      id: admin.id,
+      email: admin.account.email,
+      name: admin.name,
+      phone: admin.phone,
+      role: admin.account.role,
+    };
   }
 
   async refreshTokens(
