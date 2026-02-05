@@ -65,6 +65,12 @@ export class UserAuthController {
   @ApiOperation({ summary: 'Get current user information' })
   @ApiResponse({ status: 200, type: UserData })
   async getCurrentUser(@Request() req: any) {
+    if (req.user.role === 'ADMIN') {
+      const admin = await this.userAuthService.getCurrentAdmin(
+        req.user.adminId,
+      );
+      return admin;
+    }
     const user = await this.userAuthService.getCurrentUser(req.user.userId);
     return user;
   }
@@ -88,6 +94,12 @@ export class UserAuthController {
     @Request() req: any,
     @Body() changePasswordDto: ChangePasswordDto,
   ) {
+    if (req.user.role === 'ADMIN') {
+      return this.userAuthService.changePasswordAdmin(
+        req.user.adminId,
+        changePasswordDto,
+      );
+    }
     return this.userAuthService.changePassword(
       req.user.userId,
       changePasswordDto,

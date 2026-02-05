@@ -29,16 +29,15 @@ export class UserAuthService {
       where: {
         OR: [{ email: emailOrUsername }, { username: emailOrUsername }],
       },
-      include: { user: true },
+      include: { user: true, admin: true },
     });
 
-    if (
-      !account ||
-      !account.passwordHash ||
-      !account.user ||
-      account.role !== 'USER'
-    ) {
+    if (!account || !account.passwordHash) {
       throw new ForbiddenException('Sai tài khoản hoặc mật khẩu');
+    }
+
+    if (account.role !== 'USER' && account.role !== 'ADMIN') {
+      throw new ForbiddenException('Access Denied - Invalid account');
     }
 
     const isPasswordValid = await bcrypt.compare(
@@ -54,6 +53,7 @@ export class UserAuthService {
       role: account.role,
       email: account.email,
       userId: account.user.id,
+      adminId: account.admin?.id,
     });
 
     await this.updateRefreshToken(account.id, tokens.refresh_token);
@@ -73,6 +73,20 @@ export class UserAuthService {
     return user;
   }
 
+  async getCurrentAdmin(adminId: string) {
+    const admin = await this.prisma.userAdmin.findUnique({
+      where: { id: adminId },
+      include: {
+        account: true,
+        user: true,
+      },
+    });
+    if (!admin) {
+      throw new ForbiddenException('Access Denied - Invalid admin');
+    }
+    return admin;
+  }
+
   async refreshTokens(
     refreshTokenDto: RefreshTokenDto,
   ): Promise<AuthResponseDto> {
@@ -80,10 +94,14 @@ export class UserAuthService {
 
     const account = await this.prisma.account.findFirst({
       where: { refreshToken },
-      include: { user: true },
+      include: { user: true, admin: true },
     });
 
-    if (!account?.user || account.role !== 'USER') {
+    if (!account?.user && !account?.admin) {
+      throw new ForbiddenException('Access Denied - Invalid refresh token');
+    }
+
+    if (account.role !== 'USER' && account.role !== 'ADMIN') {
       throw new ForbiddenException('Access Denied - Invalid refresh token');
     }
 
@@ -92,6 +110,7 @@ export class UserAuthService {
       email: account.email,
       userId: account.user.id,
       role: account.role,
+      adminId: account.admin?.id,
     });
 
     await this.updateRefreshToken(account.id, tokens.refresh_token);
@@ -144,14 +163,53 @@ export class UserAuthService {
     return { message: 'Đổi mật khẩu thành công' };
   }
 
+  async changePasswordAdmin(
+    adminId: string,
+    changePasswordDto: ChangePasswordDto,
+  ): Promise<{ message: string }> {
+    const { oldPassword, newPassword } = changePasswordDto;
+
+    const admin = await this.prisma.userAdmin.findUnique({
+      where: { id: adminId },
+      include: { account: true },
+    });
+
+    const account = await this.prisma.account.findUnique({
+      where: { id: admin.account.id },
+    });
+
+    if (!admin || !admin.account || !admin.account.passwordHash) {
+      throw new ForbiddenException('Tài khoản không hợp lệ');
+    }
+
+    const isOldPasswordValid = await bcrypt.compare(
+      oldPassword,
+      account.passwordHash,
+    );
+    if (!isOldPasswordValid) {
+      throw new ForbiddenException('Mật khẩu cũ không đúng');
+    }
+
+    const newPasswordHash = await bcrypt.hash(newPassword, 10);
+
+    await this.prisma.account.update({
+      where: { id: account.id },
+      data: { passwordHash: newPasswordHash },
+    });
+
+    return { message: 'Đổi mật khẩu thành công' };
+  }
+
   private async generateTokens({
     userId,
+    adminId,
     email,
     accountId,
     role,
   }: {
     accountId: string;
     userId: string;
+    adminId: string;
     email: string;
     role: string;
   }) {
@@ -160,6 +218,7 @@ export class UserAuthService {
       email,
       userId,
       role,
+      adminId,
     };
 
     const [access_token, refresh_token] = await Promise.all([

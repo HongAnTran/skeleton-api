@@ -5,12 +5,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { UserAuthService } from './services/user-auth.service';
 import { EmployeeAuthService } from './services/employee-auth.service';
-import { UserAdminAuthService } from './services/user-admin-auth.service';
-import { UserAuthController } from './controllers/user-auth.controller';
 import { EmployeeAuthController } from './controllers/employee-auth.controller';
-import { UserAdminAuthController } from './controllers/user-admin-auth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { DatabaseModule } from '../../database/database.module';
+import { UserAuthController } from './controllers/user-auth.controller';
 
 @Module({
   imports: [
@@ -27,22 +25,8 @@ import { DatabaseModule } from '../../database/database.module';
       inject: [ConfigService],
     }),
   ],
-  controllers: [
-    UserAuthController,
-    EmployeeAuthController,
-    UserAdminAuthController,
-  ],
-  providers: [
-    UserAuthService,
-    EmployeeAuthService,
-    UserAdminAuthService,
-    JwtStrategy,
-  ],
-  exports: [
-    UserAuthService,
-    EmployeeAuthService,
-    UserAdminAuthService,
-    JwtModule,
-  ],
+  controllers: [EmployeeAuthController, UserAuthController],
+  providers: [UserAuthService, EmployeeAuthService, JwtStrategy],
+  exports: [UserAuthService, EmployeeAuthService, JwtModule],
 })
 export class AuthModule {}
