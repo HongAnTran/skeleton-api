@@ -76,7 +76,6 @@ model UserAdmin {
   userId        String   // User được quản lý
   name          String
   phone         String?
-  email         String?
   accountId String  @unique // Account của quản trị viên (1-1)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt

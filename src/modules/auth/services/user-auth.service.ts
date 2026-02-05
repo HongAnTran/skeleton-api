@@ -48,12 +48,32 @@ export class UserAuthService {
       throw new ForbiddenException('Sai mật khẩu');
     }
 
+    if (account.role === 'ADMIN') {
+      const userAdmin = await this.prisma.userAdmin.findUnique({
+        where: { id: account.admin.id },
+        include: {
+          user: true,
+        },
+      });
+
+      const tokens = await this.generateTokens({
+        accountId: account.id,
+        role: account.role,
+        email: account.email,
+        userId: userAdmin.user.id,
+        adminId: userAdmin.id,
+      });
+
+      await this.updateRefreshToken(account.id, tokens.refresh_token);
+
+      return tokens;
+    }
+
     const tokens = await this.generateTokens({
       accountId: account.id,
       role: account.role,
       email: account.email,
       userId: account.user.id,
-      adminId: account.admin?.id,
     });
 
     await this.updateRefreshToken(account.id, tokens.refresh_token);
@@ -120,12 +140,32 @@ export class UserAuthService {
       throw new ForbiddenException('Access Denied - Invalid refresh token');
     }
 
+    if (account.role === 'ADMIN') {
+      const userAdmin = await this.prisma.userAdmin.findUnique({
+        where: { id: account.admin.id },
+        include: {
+          user: true,
+        },
+      });
+
+      const tokens = await this.generateTokens({
+        accountId: account.id,
+        role: account.role,
+        email: account.email,
+        userId: userAdmin.user.id,
+        adminId: userAdmin.id,
+      });
+
+      await this.updateRefreshToken(account.id, tokens.refresh_token);
+
+      return tokens;
+    }
+
     const tokens = await this.generateTokens({
       accountId: account.id,
       email: account.email,
       userId: account.user.id,
       role: account.role,
-      adminId: account.admin?.id,
     });
 
     await this.updateRefreshToken(account.id, tokens.refresh_token);
@@ -224,7 +264,7 @@ export class UserAuthService {
   }: {
     accountId: string;
     userId: string;
-    adminId: string;
+    adminId?: string;
     email: string;
     role: string;
   }) {
