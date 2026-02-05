@@ -29,7 +29,7 @@ export class UserAuthService {
       where: {
         OR: [{ email: emailOrUsername }, { username: emailOrUsername }],
       },
-      include: { user: true, admin: true },
+      include: { user: true, admin: { include: { user: true } } },
     });
 
     if (!account || !account.passwordHash) {
@@ -49,12 +49,7 @@ export class UserAuthService {
     }
 
     if (account.role === 'ADMIN') {
-      const userAdmin = await this.prisma.userAdmin.findUnique({
-        where: { id: account.admin.id },
-        include: {
-          user: true,
-        },
-      });
+      const userAdmin = account.admin;
 
       const tokens = await this.generateTokens({
         accountId: account.id,
@@ -129,7 +124,7 @@ export class UserAuthService {
 
     const account = await this.prisma.account.findFirst({
       where: { refreshToken },
-      include: { user: true, admin: true },
+      include: { user: true, admin: { include: { user: true } } },
     });
 
     if (!account?.user && !account?.admin) {
@@ -141,12 +136,7 @@ export class UserAuthService {
     }
 
     if (account.role === 'ADMIN') {
-      const userAdmin = await this.prisma.userAdmin.findUnique({
-        where: { id: account.admin.id },
-        include: {
-          user: true,
-        },
-      });
+      const userAdmin = account.admin;
 
       const tokens = await this.generateTokens({
         accountId: account.id,
