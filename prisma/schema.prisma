@@ -62,30 +62,30 @@ model Account {
   role                AccountRole 
   user                User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
   employee            Employee? @relation(fields: [employeeId], references: [id], onDelete: Cascade)
-  admin               UserAdmin? @relation(fields: [adminId], references: [id], onDelete: Cascade)
-  adminId             String?     @unique
+  admin               UserAdmin? @relation("UserAdminsAccounts")
   createdAt    DateTime   @default(now())
   updatedAt    DateTime   @updatedAt
   @@index([userId])
   @@index([employeeId])
-  @@index([adminId])
-  @@unique([userId, employeeId, adminId])
+  @@unique([userId, employeeId])
 }
 
 
 model UserAdmin {
   id            String   @id @default(cuid())
   userId        String   // User được quản lý
-  adminAccountId String  // Account của quản trị viên
+  name          String
+  phone         String?
+  email         String?
+  accountId String  @unique // Account của quản trị viên (1-1)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-  
   user          User     @relation("UserAdmins", fields: [userId], references: [id], onDelete: Cascade)
-  adminAccount  Account  @relation("AdminAccounts", fields: [adminAccountId], references: [id], onDelete: Cascade)
+  account       Account  @relation("UserAdminsAccounts", fields: [accountId], references: [id], onDelete: Cascade)
   
-  @@unique([userId, adminAccountId])
+  @@unique([userId, accountId])
   @@index([userId])
-  @@index([adminAccountId])
+  @@index([accountId])
 }
 
 model Employee {

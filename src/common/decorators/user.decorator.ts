@@ -6,6 +6,7 @@ export interface JwtPayload {
   role: string;
   userId: string;
   employeeId?: string; // Only for employees
+  adminId?: string; // Only for user admins
 }
 export const User = createParamDecorator(
   (data: string, ctx: ExecutionContext) => {

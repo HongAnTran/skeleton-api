@@ -77,3 +77,42 @@ export class EmployeeData {
   @ApiProperty({ type: [Object], required: false })
   shiftSignups?: any[];
 }
+
+export class UserAdminData {
+  @ApiProperty()
+  id: string;
+
+  @ApiProperty()
+  name: string;
+
+  @ApiProperty({ required: false })
+  phone?: string;
+
+  @ApiProperty({ required: false })
+  email?: string;
+
+  @ApiProperty()
+  userId: string;
+
+  @ApiProperty()
+  accountId: string;
+
+  @ApiProperty()
+  createdAt: Date;
+
+  @ApiProperty()
+  updatedAt: Date;
+
+  @ApiProperty({ required: false })
+  user?: {
+    id: string;
+    name: string;
+  };
+
+  @ApiProperty({ required: false })
+  account?: {
+    id: string;
+    email: string;
+    username: string;
+  };
+}

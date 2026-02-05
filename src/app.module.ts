@@ -14,6 +14,7 @@ import { LoggingMiddleware } from './common/middleware/logging.middleware';
 import { AuthModule } from './modules/auth/auth.module';
 import { UsersModule } from './modules/users/users.module';
 import { EmployeesModule } from './modules/employees/employees.module';
+import { UserAdminsModule } from './modules/user-admins/user-admins.module';
 import { BranchesModule } from './modules/branches/branches.module';
 import { DepartmentsModule } from './modules/departments/departments.module';
 import { ShiftSlotsModule } from './modules/shift-slots/shift-slots.module';
@@ -58,6 +59,7 @@ import { CronModule } from './common/cron/cron.module';
     AuthModule,
     UsersModule,
     EmployeesModule,
+    UserAdminsModule,
     BranchesModule,
     DepartmentsModule,
     ShiftSlotsModule,
