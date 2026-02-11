@@ -8,20 +8,26 @@ import { CreateTaskDto } from '../dto/task-instance/create-task.dto';
 import { UpdateTaskInstanceDto } from '../dto/task-instance/update-task-instance.dto';
 import { QueryTaskDto } from '../dto/task-instance/query-task.dto';
 import { Prisma } from '@prisma/client';
+import { TaskCycleService } from './task-cycle.service';
 
 @Injectable()
 export class TaskService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private taskCycleService: TaskCycleService,
+  ) {}
 
   async create(userId: string, createDto: CreateTaskDto) {
     const { departmentId, ...rest } = createDto;
-    return this.prisma.taskV2.create({
+    const task = await this.prisma.taskV2.create({
       data: {
         ...rest,
         departmentId,
         userId,
       },
     });
+    await this.taskCycleService.create12CyclesForTask(userId, task.id);
+    return task;
   }
   async findAll(userId: string, query: QueryTaskDto) {
     const where: Prisma.TaskV2WhereInput = {

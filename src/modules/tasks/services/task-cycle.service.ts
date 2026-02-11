@@ -152,20 +152,74 @@ export class TaskCycleService {
         isActive: true,
       },
     });
-    const cyclePromises = tasks.map((task) => {
-      return this.prisma.taskCycleV2.create({
-        data: {
-          ...createDto,
-          task: {
-            connect: {
-              id: task.id,
-            },
+    const baseDate = new Date(createDto.periodStart);
+    const baseYear = baseDate.getFullYear();
+    const baseMonth = baseDate.getMonth();
+
+    const allCycles: Awaited<
+      ReturnType<typeof this.prisma.taskCycleV2.create>
+    >[] = [];
+
+    for (const task of tasks) {
+      for (let i = 0; i < 12; i++) {
+        const periodStart = new Date(baseYear, baseMonth + i, 1);
+        const periodEnd = new Date(
+          baseYear,
+          baseMonth + i + 1,
+          0,
+          23,
+          59,
+          59,
+          999,
+        );
+
+        const cycle = await this.prisma.taskCycleV2.create({
+          data: {
+            taskId: task.id,
+            periodStart,
+            periodEnd,
           },
+        });
+        allCycles.push(cycle);
+        await this.taskAssignmentService.assignEmployeesToCycle(userId, {
+          cycleId: cycle.id,
+        });
+      }
+    }
+
+    return allCycles;
+  }
+
+  async create12CyclesForTask(
+    userId: string,
+    taskId: string,
+    periodStart?: Date,
+  ) {
+    const baseDate = periodStart ?? new Date();
+    const baseYear = baseDate.getFullYear();
+    const baseMonth = baseDate.getMonth();
+
+    const cycles = [];
+    for (let i = 0; i < 12; i++) {
+      const periodStartDate = new Date(baseYear, baseMonth + i, 1);
+      const periodEndDate = new Date(
+        baseYear,
+        baseMonth + i + 1,
+        0,
+        23,
+        59,
+        59,
+        999,
+      );
+
+      const cycle = await this.prisma.taskCycleV2.create({
+        data: {
+          taskId,
+          periodStart: periodStartDate,
+          periodEnd: periodEndDate,
         },
       });
-    });
-    const cycles = await Promise.all(cyclePromises);
-    for await (const cycle of cycles) {
+      cycles.push(cycle);
       await this.taskAssignmentService.assignEmployeesToCycle(userId, {
         cycleId: cycle.id,
       });
