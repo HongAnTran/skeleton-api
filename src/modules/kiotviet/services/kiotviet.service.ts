@@ -5,6 +5,13 @@ import { firstValueFrom } from 'rxjs';
 import { SearchInvoiceDto } from '../dto/search-invoice.dto';
 import { InvoiceResponseDto } from '../dto/invoice-response.dto';
 import { WarrantyInfoDto } from '../dto/warranty.dto';
+import { GetUsersQueryDto } from '../dto/get-users-query.dto';
+import { GetUsersResponseDto, KiotVietUserDto } from '../dto/user-response.dto';
+import { GetInvoicesByUserQueryDto } from '../dto/get-invoices-by-user.dto';
+import {
+  GetInvoicesByUserResponseDto,
+  UserInvoicesReportDto,
+} from '../dto/get-invoices-by-user.dto';
 
 interface KiotVietTokenResponse {
   access_token: string;
@@ -15,6 +22,22 @@ interface KiotVietTokenResponse {
 interface KiotVietInvoiceResponse {
   data: InvoiceResponseDto[];
   total: number;
+}
+
+/** Raw invoice từ API KiotViet (có thêm soldById) */
+interface KiotVietRawInvoice extends InvoiceResponseDto {
+  soldById?: number;
+}
+
+interface KiotVietUsersApiResponse {
+  total: number;
+  pageSize: number;
+  data: Array<
+    KiotVietUserDto & {
+      isAdmin?: boolean;
+    }
+  >;
+  removeIds?: number[];
 }
 
 interface GoogleScriptInvoiceResponse {
@@ -107,6 +130,179 @@ export class KiotVietService {
       throw new HttpException(
         'Không thể kết nối tới KiotViet API',
         HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+  }
+
+  /**
+   * Lấy danh sách người dùng của cửa hàng.
+   * Chỉ trả về user đã xác nhận, không bao gồm Super Admin (isAdmin = true).
+   */
+  async getUsers(query: GetUsersQueryDto): Promise<GetUsersResponseDto> {
+    if (!this.retailer || !this.clientId || !this.clientSecret) {
+      throw new HttpException(
+        'KiotViet chưa được cấu hình đầy đủ',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    try {
+      const token = await this.getAccessToken();
+      const headers = {
+        Retailer: this.retailer,
+        Authorization: `Bearer ${token}`,
+      };
+
+      const params: Record<string, string | number | boolean | undefined> = {};
+      if (query.lastModifiedFrom != null)
+        params.lastModifiedFrom = query.lastModifiedFrom;
+      if (query.pageSize != null) params.pageSize = query.pageSize;
+      if (query.currentItem != null) params.currentItem = query.currentItem;
+      if (query.orderBy != null) params.orderBy = query.orderBy;
+      if (query.orderDirection != null)
+        params.orderDirection = query.orderDirection;
+      if (query.includeRemoveIds != null)
+        params.includeRemoveIds = query.includeRemoveIds;
+
+      const response = await firstValueFrom(
+        this.httpService.get<KiotVietUsersApiResponse>(
+          `${this.baseUrl}/users`,
+          { headers, params },
+        ),
+      );
+
+      const rawData = response.data?.data ?? [];
+      const total = response.data?.total ?? 0;
+      const pageSize = response.data?.pageSize ?? query.pageSize ?? 20;
+
+      // Loại bỏ Super Admin (isAdmin = true)
+      const data = rawData
+        .filter((user) => user.isAdmin !== true)
+        .map(
+          (user): KiotVietUserDto => ({
+            id: user.id,
+            userName: user.userName,
+            givenName: user.givenName,
+            address: user.address,
+            mobilePhone: user.mobilePhone,
+            email: user.email,
+            description: user.description,
+            retailerId: user.retailerId,
+            birthDate: user.birthDate,
+            createdDate: user.createdDate,
+          }),
+        );
+
+      const result: GetUsersResponseDto = {
+        total,
+        pageSize,
+        data,
+      };
+      if (response.data?.removeIds != null) {
+        result.removeIds = response.data.removeIds;
+      }
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error('Failed to get users', error);
+      throw new HttpException(
+        'Không thể lấy danh sách người dùng từ KiotViet',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
+   * Lấy toàn bộ hóa đơn trong khoảng thời gian (phân trang 100/item),
+   * sau đó lọc theo userId (soldById) và trả về kèm báo cáo.
+   */
+  async getInvoicesByUser(
+    query: GetInvoicesByUserQueryDto,
+  ): Promise<GetInvoicesByUserResponseDto> {
+    if (!this.retailer || !this.clientId || !this.clientSecret) {
+      throw new HttpException(
+        'KiotViet chưa được cấu hình đầy đủ',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    try {
+      const token = await this.getAccessToken();
+      const headers = {
+        Retailer: this.retailer,
+        Authorization: `Bearer ${token}`,
+      };
+
+      const pageSize = 100;
+      let currentItem = 0;
+      const allInvoices: KiotVietRawInvoice[] = [];
+      let totalFromApi: number | null = null;
+
+      // Gọi API theo trang (tối đa 100/item) cho đến khi lấy hết
+      do {
+        const params: Record<string, string | number> = {
+          format: 'json',
+          pageSize,
+          currentItem,
+          status: 1, // đơn đã xác nhận
+        };
+        if (query.fromPurchaseDate)
+          params.fromPurchaseDate = query.fromPurchaseDate;
+        if (query.toPurchaseDate) params.toPurchaseDate = query.toPurchaseDate;
+
+        const response = await firstValueFrom(
+          this.httpService.get<{ data: KiotVietRawInvoice[]; total: number }>(
+            `${this.baseUrl}/invoices`,
+            { headers, params },
+          ),
+        );
+
+        const pageData = response.data?.data ?? [];
+        if (totalFromApi == null) totalFromApi = response.data?.total ?? 0;
+
+        allInvoices.push(...pageData);
+
+        if (
+          pageData.length < pageSize ||
+          allInvoices.length >= (totalFromApi || 0)
+        ) {
+          break;
+        }
+        currentItem += pageSize;
+      } while (true);
+
+      // Lọc theo userId (API không hỗ trợ filter soldById nên lọc phía backend)
+      const byUser = allInvoices.filter((inv) => {
+        const soldBy = (inv as any).soldById;
+        return soldBy != null && Number(soldBy) === Number(query.userId);
+      });
+
+      const data: InvoiceResponseDto[] = byUser.map((inv) => {
+        return this.calculateWarranty(inv as InvoiceResponseDto);
+      });
+
+      const totalValue = data.reduce(
+        (sum, inv) => sum + (inv.totalPayment ?? 0),
+        0,
+      );
+      const warrantyOrderCount = data.filter(
+        (inv) => inv.warranty != null,
+      ).length;
+
+      const report: UserInvoicesReportDto = {
+        totalOrders: data.length,
+        totalValue,
+        warrantyOrderCount,
+        revenue: totalValue,
+      };
+
+      return { data, report };
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error('Failed to get invoices by user', error);
+      throw new HttpException(
+        'Không thể lấy danh sách hóa đơn từ KiotViet',
+        HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
   }
