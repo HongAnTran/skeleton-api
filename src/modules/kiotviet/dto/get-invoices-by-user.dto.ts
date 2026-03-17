@@ -37,8 +37,44 @@ export class UserInvoicesReportDto {
   @ApiProperty({ description: 'Tổng giá trị (tổng doanh thu các đơn)' })
   totalValue: number;
 
+  @ApiProperty({
+    description:
+      'Doanh thu phụ kiện (tổng tiền các sản phẩm ngoài sản phẩm chính, không bao gồm bảo hành)',
+  })
+  accessoryRevenue: number;
+
+  @ApiProperty({
+    description: 'Doanh thu bảo hành (tổng tiền các dòng sản phẩm bảo hành)',
+  })
+  warrantyRevenue: number;
+
   @ApiProperty({ description: 'Số đơn có bảo hành' })
   warrantyOrderCount: number;
+
+  @ApiProperty({
+    description: 'Số lượng gói bảo hành đã bán (tổng quantity các dòng bảo hành)',
+  })
+  warrantyQuantity: number;
+
+  @ApiProperty({
+    description: 'Chi tiết theo từng loại bảo hành',
+    type: 'array',
+    items: {
+      type: 'object',
+      properties: {
+        warrantyType: { type: 'string', example: 'Bảo Hành CARE⁺ PRO MAX' },
+        quantity: { type: 'number', example: 3 },
+        revenue: { type: 'number', example: 1500000 },
+        orderCount: { type: 'number', example: 2 },
+      },
+    },
+  })
+  warrantyBreakdown: Array<{
+    warrantyType: string;
+    quantity: number;
+    revenue: number;
+    orderCount: number;
+  }>;
 
   @ApiProperty({ description: 'Doanh thu (bằng totalValue)' })
   revenue: number;
