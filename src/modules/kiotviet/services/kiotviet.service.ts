@@ -283,7 +283,12 @@ export class KiotVietService {
       let warrantyQuantity = 0;
       const warrantyBreakdownMap = new Map<
         string,
-        { warrantyType: string; quantity: number; revenue: number; orderIds: Set<number> }
+        {
+          warrantyType: string;
+          quantity: number;
+          revenue: number;
+          orderIds: Set<number>;
+        }
       >();
 
       const data: InvoiceResponseDto[] = byUser.map((inv) => {
@@ -307,41 +312,35 @@ export class KiotVietService {
 
         // Breakdown theo từng loại bảo hành
         for (const d of warrantyLines) {
-          const type = this.getWarrantyTypeFromProductName(d?.productName || '');
+          const type = this.getWarrantyTypeFromProductName(
+            d?.productName || '',
+          );
           if (!type) continue;
           const key = type;
-          const existing =
-            warrantyBreakdownMap.get(key) ??
-            {
-              warrantyType: key,
-              quantity: 0,
-              revenue: 0,
-              orderIds: new Set<number>(),
-            };
+          const existing = warrantyBreakdownMap.get(key) ?? {
+            warrantyType: key,
+            quantity: 0,
+            revenue: 0,
+            orderIds: new Set<number>(),
+          };
 
           existing.quantity += Number(d?.quantity ?? 0);
           existing.revenue += Number(d?.subTotal ?? 0);
-          if ((inv as any).id != null) existing.orderIds.add(Number((inv as any).id));
+          if ((inv as any).id != null)
+            existing.orderIds.add(Number((inv as any).id));
 
           warrantyBreakdownMap.set(key, existing);
         }
 
         // Sản phẩm chính: dòng non-warranty có subTotal lớn nhất; phụ kiện: phần còn lại
         if (nonWarrantyLines.length > 0) {
-          let mainIndex = 0;
-          let maxSubTotal = Number(nonWarrantyLines[0]?.subTotal ?? 0);
-          for (let i = 1; i < nonWarrantyLines.length; i++) {
-            const st = Number(nonWarrantyLines[i]?.subTotal ?? 0);
-            if (st > maxSubTotal) {
-              maxSubTotal = st;
-              mainIndex = i;
-            }
-          }
-          accessoryRevenue += nonWarrantyLines.reduce(
-            (sum: number, d: any, idx: number) =>
-              idx === mainIndex ? sum : sum + Number(d?.subTotal ?? 0),
-            0,
-          );
+          accessoryRevenue += nonWarrantyLines.reduce((sum: number, d: any) => {
+            // Product code dạng IMEI (chuỗi số dài) => không phải phụ kiện
+            const code = String(d?.productCode ?? '').trim();
+            if (this.isImeiLike(code)) return sum;
+
+            return sum + Number(d?.subTotal ?? 0);
+          }, 0);
         }
 
         return this.calculateWarranty(inv as InvoiceResponseDto);
@@ -362,12 +361,14 @@ export class KiotVietService {
         warrantyRevenue,
         warrantyOrderCount,
         warrantyQuantity,
-        warrantyBreakdown: Array.from(warrantyBreakdownMap.values()).map((x) => ({
-          warrantyType: x.warrantyType,
-          quantity: x.quantity,
-          revenue: x.revenue,
-          orderCount: x.orderIds.size,
-        })),
+        warrantyBreakdown: Array.from(warrantyBreakdownMap.values()).map(
+          (x) => ({
+            warrantyType: x.warrantyType,
+            quantity: x.quantity,
+            revenue: x.revenue,
+            orderCount: x.orderIds.size,
+          }),
+        ),
         revenue: totalValue,
       };
 
@@ -390,6 +391,15 @@ export class KiotVietService {
     const cleaned = input.replace(/[\s\-\(\)]/g, '');
     // Kiểm tra nếu chỉ chứa số và có độ dài từ 9-11 ký tự
     return /^\d{9,11}$/.test(cleaned);
+  }
+
+  /**
+   * Kiểm tra input có giống IMEI không (chuỗi số dài, ví dụ 357137340314839)
+   */
+  private isImeiLike(input: string): boolean {
+    const cleaned = String(input ?? '').replace(/[\s\-\(\)]/g, '');
+    // IMEI thường là 15 số; thực tế có thể gặp dải 14-18 (tuỳ nguồn dữ liệu)
+    return /^\d{14,18}$/.test(cleaned);
   }
 
   /**
