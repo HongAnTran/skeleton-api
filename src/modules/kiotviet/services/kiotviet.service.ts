@@ -281,6 +281,7 @@ export class KiotVietService {
       let accessoryRevenue = 0;
       let warrantyRevenue = 0;
       let warrantyQuantity = 0;
+      let iphoneQuantity = 0;
       const warrantyBreakdownMap = new Map<
         string,
         {
@@ -300,6 +301,13 @@ export class KiotVietService {
         const nonWarrantyLines = details.filter(
           (d: any) => !this.isWarrantyProduct(d?.productName || ''),
         );
+
+        // Tổng số lượng iPhone bán ra (1 hoá đơn có thể bán nhiều máy)
+        iphoneQuantity += nonWarrantyLines.reduce((sum: number, d: any) => {
+          const code = String(d?.productCode ?? '').trim();
+          if (!this.isImeiLike(code)) return sum;
+          return sum + Number(d?.quantity ?? 0);
+        }, 0);
 
         warrantyRevenue += warrantyLines.reduce(
           (sum: number, d: any) => sum + Number(d?.subTotal ?? 0),
@@ -355,7 +363,7 @@ export class KiotVietService {
       ).length;
 
       const report: UserInvoicesReportDto = {
-        totalOrders: data.length,
+        totalOrders: iphoneQuantity,
         totalValue,
         accessoryRevenue,
         warrantyRevenue,
