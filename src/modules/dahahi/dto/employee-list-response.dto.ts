@@ -1,45 +1,48 @@
-import { ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
  * Một item nhân viên trong response từ API Dahahi GetEmployeeList.
  * Chỉ khai báo các trường cần dùng; API có thể trả thêm trường khác.
  */
 export class DahahiEmployeeItemDto {
-  @ApiPropertyOptional({ description: 'Trạng thái nhân viên (VD: Đang làm)' })
-  StatusName?: string;
+  @ApiProperty({ description: 'ID nhân viên' })
+  _id: string;
 
-  @ApiPropertyOptional({ description: 'Mã nhân viên' })
-  EmployeeCode?: string;
+  @ApiProperty({ description: 'Trạng thái nhân viên (VD: Đang làm)' })
+  StatusName: string;
 
-  @ApiPropertyOptional({ description: 'Họ tên' })
-  Name?: string;
+  @ApiProperty({ description: 'Mã nhân viên' })
+  EmployeeCode: string;
 
-  @ApiPropertyOptional({ description: 'Số điện thoại' })
-  Mobile?: string;
+  @ApiProperty({ description: 'Họ tên' })
+  Name: string;
 
-  @ApiPropertyOptional({ description: 'Email' })
-  Email?: string | null;
+  @ApiProperty({ description: 'Số điện thoại' })
+  Mobile: string;
 
-  @ApiPropertyOptional({ description: 'Địa chỉ' })
-  Address?: string | null;
+  @ApiProperty({ description: 'Email' })
+  Email: string;
 
-  @ApiPropertyOptional({ description: 'Đã xóa hay chưa' })
-  IsDeleted?: boolean;
+  @ApiProperty({ description: 'Địa chỉ' })
+  Address: string;
 
-  @ApiPropertyOptional({ description: 'Người tạo (mã/SĐT)' })
-  CreatedBy?: string;
+  @ApiProperty({ description: 'Đã xóa hay chưa' })
+  IsDeleted: boolean;
 
-  @ApiPropertyOptional({ description: 'Mã trạng thái (1 = đang làm, ...)' })
-  Status?: number;
+  @ApiProperty({ description: 'Người tạo (mã/SĐT)' })
+  CreatedBy: string;
 
-  @ApiPropertyOptional({ description: 'Ngày tạo (ISO 8601)' })
-  CreatedDate?: string;
+  @ApiProperty({ description: 'Mã trạng thái (1 = đang làm, ...)' })
+  Status: number;
 
-  @ApiPropertyOptional({ description: 'URL ảnh đại diện' })
-  Avatar?: string | null;
+  @ApiProperty({ description: 'Ngày tạo (ISO 8601)' })
+  CreatedDate: string;
 
-  @ApiPropertyOptional({ description: 'Tên phòng ban cấu trúc (VD: Sau BH)' })
-  StructureDepartmentName?: string | null;
+  @ApiProperty({ description: 'URL ảnh đại diện' })
+  Avatar: string;
+
+  @ApiProperty({ description: 'Tên phòng ban cấu trúc (VD: Sau BH)' })
+  StructureDepartmentName: string;
 }
 
 /**
@@ -47,17 +50,17 @@ export class DahahiEmployeeItemDto {
  */
 export class GetEmployeeListResponseDto {
   @ApiPropertyOptional({ description: 'Mã lỗi (null nếu thành công)' })
-  ErrorCode?: number | null;
+  ErrorCode: number | null;
 
   @ApiPropertyOptional({ description: 'Thông báo lỗi' })
-  ErrorMessage?: string;
+  ErrorMessage: string;
 
   @ApiPropertyOptional({ description: 'Tổng số bản ghi' })
-  Total?: number;
+  Tota?: number;
 
   @ApiPropertyOptional({
     description: 'Danh sách nhân viên',
     type: [DahahiEmployeeItemDto],
   })
-  Data?: DahahiEmployeeItemDto[];
+  Data: DahahiEmployeeItemDto[];
 }

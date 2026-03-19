@@ -80,8 +80,19 @@ export class DahahiService {
       body,
     );
     return result.map((item) => ({
-      ...item,
-      avatar: item.Avatar ? `${this.baseUrl}${item.Avatar}` : null,
+      _id: item._id,
+      Address: item.Address,
+      CreatedBy: item.CreatedBy,
+      CreatedDate: item.CreatedDate,
+      Email: item.Email,
+      EmployeeCode: item.EmployeeCode,
+      Name: item.Name,
+      Mobile: item.Mobile,
+      Status: item.Status,
+      StatusName: item.StatusName,
+      StructureDepartmentName: item.StructureDepartmentName,
+      IsDeleted: item.IsDeleted,
+      Avatar: item.Avatar ? `${this.baseUrl}${item.Avatar}` : '',
     }));
   }
 }
