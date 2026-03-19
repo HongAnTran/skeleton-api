@@ -41,7 +41,7 @@ export class DahahiService {
 
     try {
       const response = await firstValueFrom(
-        this.httpService.post<T>(`${this.baseUrl}/api/${path}`, body, {
+        this.httpService.post<T>(`${this.baseUrl}/api${path}`, body, {
           headers,
           timeout: 30000,
         }),
