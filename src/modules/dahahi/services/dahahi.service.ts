@@ -72,7 +72,7 @@ export class DahahiService {
     const body = {
       FullName: query.FullName ?? '',
       PageIndex: query.PageIndex ?? 1,
-      PageSize: query.PageSize ?? 20,
+      PageSize: query.PageSize ?? 50,
     };
 
     const { Data: result } = await this.post<GetEmployeeListResponseDto>(
