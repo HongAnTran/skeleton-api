@@ -19,7 +19,7 @@ export class GetEmployeeListDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  PageIndex: number = 1;
+  pageIndex: number = 1;
 
   @ApiPropertyOptional({
     description: 'Số bản ghi mỗi trang',
@@ -29,5 +29,5 @@ export class GetEmployeeListDto {
   @Type(() => Number)
   @IsInt()
   @Min(1)
-  PageSize: number = 50;
+  pageSize: number = 50;
 }
