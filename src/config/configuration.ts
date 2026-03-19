@@ -39,4 +39,9 @@ export default () => ({
     clientId: process.env.KIOTVIET_CLIENT_ID,
     clientSecret: process.env.KIOTVIET_CLIENT_SECRET,
   },
+  dahahi: {
+    baseUrl: process.env.DAHAHI_BASE_URL,
+    appKey: process.env.DAHAHI_APP_KEY,
+    secretKey: process.env.DAHAHI_SECRET_KEY,
+  },
 });
