@@ -71,14 +71,6 @@ export class DahahiCheckinHistoryReportDto {
   totalWorkHours: number;
 
   @ApiProperty({
-    description:
-      'Danh sách ngày quên checkout (YYYY-MM-DD): ngày có >1 cụm check-in (hai lần cách nhau > 2 phút, gom như trùng máy không tính).',
-    type: [String],
-    example: ['2026-03-15', '2026-03-18'],
-  })
-  forgotCheckoutDates: string[];
-
-  @ApiProperty({
     description: 'Tổng số bản ghi check-in trả về (đã map URL ảnh)',
   })
   totalRecords: number;

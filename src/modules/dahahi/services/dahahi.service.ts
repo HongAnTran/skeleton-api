@@ -129,7 +129,6 @@ export class DahahiService {
     }
 
     let totalWorkHours = 0;
-    const forgotCheckoutDates: string[] = [];
 
     const sortedDayKeys = [...byDay.keys()].sort();
 
@@ -142,21 +141,10 @@ export class DahahiService {
       const first = times[0];
       const last = times[times.length - 1];
       totalWorkHours += (last - first) / (1000 * 60 * 60);
-
-      let clusters = 1;
-      for (let i = 1; i < times.length; i += 1) {
-        if (times[i] - times[i - 1] > gap) {
-          clusters += 1;
-        }
-      }
-      if (clusters > 1) {
-        forgotCheckoutDates.push(dayKey);
-      }
     }
 
     return {
       totalWorkHours: Math.round(totalWorkHours * 100) / 100,
-      forgotCheckoutDates,
       totalRecords: items.length,
     };
   }
