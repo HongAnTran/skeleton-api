@@ -108,9 +108,8 @@ export class DahahiService {
   }
 
   /**
-   * Ngày công: mỗi ngày dương lịch có ≥1 check-in = 1.
-   * Quên check-out: trong cùng ngày, mỗi “cụm” check-in cách cụm trước > 2 phút = lần vào ca mới;
-   * cụm thứ 2 trở đi trong ngày cộng 1 lần quên (không có dữ liệu checkout từ API).
+   * Giờ công: tổng (theo ngày) = (check-in cuối − check-in đầu trong ngày), cộng dồn.
+   * Ngày quên checkout: ngày có >1 cụm (hai lần cách nhau > 2 phút, gom trùng máy).
    */
   private buildCheckinReport(
     items: DahahiCheckinHistoryItemDto[],
@@ -129,23 +128,35 @@ export class DahahiService {
       byDay.set(key, list);
     }
 
-    const workDays = byDay.size;
-    let forgotCheckoutCount = 0;
+    let totalWorkHours = 0;
+    const forgotCheckoutDates: string[] = [];
 
-    for (const times of byDay.values()) {
+    const sortedDayKeys = [...byDay.keys()].sort();
+
+    for (const dayKey of sortedDayKeys) {
+      const times = byDay.get(dayKey);
+      if (!times?.length) {
+        continue;
+      }
       times.sort((a, b) => a - b);
+      const first = times[0];
+      const last = times[times.length - 1];
+      totalWorkHours += (last - first) / (1000 * 60 * 60);
+
       let clusters = 1;
       for (let i = 1; i < times.length; i += 1) {
         if (times[i] - times[i - 1] > gap) {
           clusters += 1;
         }
       }
-      forgotCheckoutCount += Math.max(0, clusters - 1);
+      if (clusters > 1) {
+        forgotCheckoutDates.push(dayKey);
+      }
     }
 
     return {
-      workDays,
-      forgotCheckoutCount,
+      totalWorkHours: Math.round(totalWorkHours * 100) / 100,
+      forgotCheckoutDates,
       totalRecords: items.length,
     };
   }

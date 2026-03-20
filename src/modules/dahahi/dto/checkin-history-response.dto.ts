@@ -65,15 +65,18 @@ export class GetCheckinHistoryResponseDto {
 export class DahahiCheckinHistoryReportDto {
   @ApiProperty({
     description:
-      'Số ngày công: số ngày dương lịch có ít nhất một lần check-in (nhiều lần cùng ngày vẫn tính 1; chưa check-out vẫn tính 1 ngày)',
+      'Tổng số giờ công (ước lượng): cộng dồn mỗi ngày (lần check-in muộn nhất − lần sớm nhất trong ngày). Ngày chỉ 1 lần chấm → 0 giờ theo công thức này.',
+    example: 42.5,
   })
-  workDays: number;
+  totalWorkHours: number;
 
   @ApiProperty({
     description:
-      'Số lần quên check-out (ước lượng): trong cùng một ngày, các lần check-in cách nhau > 2 phút được xem là lần vào ca mới; lần vào thứ 2 trở đi trong ngày = 1 lần quên. Các lần liên tiếp < 2 phút (trùng máy) gom một cụm.',
+      'Danh sách ngày quên checkout (YYYY-MM-DD): ngày có >1 cụm check-in (hai lần cách nhau > 2 phút, gom như trùng máy không tính).',
+    type: [String],
+    example: ['2026-03-15', '2026-03-18'],
   })
-  forgotCheckoutCount: number;
+  forgotCheckoutDates: string[];
 
   @ApiProperty({
     description: 'Tổng số bản ghi check-in trả về (đã map URL ảnh)',
@@ -82,7 +85,7 @@ export class DahahiCheckinHistoryReportDto {
 }
 
 /**
- * Response API: danh sách check-in + báo cáo ngày công / quên check-out.
+ * Response API: danh sách check-in + báo cáo giờ công / ngày quên check-out.
  */
 export class GetCheckinHistoryWithReportDto {
   @ApiProperty({

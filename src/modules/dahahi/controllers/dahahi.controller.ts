@@ -47,7 +47,7 @@ export class DahahiController {
   @ApiOperation({
     summary: 'Lịch sử check-in',
     description:
-      'Lấy lịch sử check-in Face Dahahi theo mã nhân viên và khoảng thời gian (FromTimeStr / ToTimeStr: DD/MM/YYYY HH:mm:ss). Trả về toàn bộ bản ghi (đã phân trang hết phía server) kèm report: ngày công, số lần quên check-out (ước lượng).',
+      'Lấy lịch sử check-in Face Dahahi theo mã nhân viên và khoảng thời gian (FromTimeStr / ToTimeStr: DD/MM/YYYY HH:mm:ss). Trả về toàn bộ bản ghi (đã phân trang hết phía server) kèm report: tổng giờ công (ước lượng), mảng ngày quên checkout.',
   })
   @ApiResponse({
     status: 200,
