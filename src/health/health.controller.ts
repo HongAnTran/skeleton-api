@@ -17,7 +17,7 @@ export class HealthController {
         status: 'ok',
         timestamp: new Date().toISOString(),
       };
-    } catch (error) {
+    } catch {
       return {
         status: 'error',
         timestamp: new Date().toISOString(),

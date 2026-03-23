@@ -55,9 +55,7 @@ export class ShiftSlotTypesController {
     const skip = (page - 1) * limit;
     const userId = user.userId;
 
-    let shiftSlotTypes, total;
-
-    [shiftSlotTypes, total] = await Promise.all([
+    const [shiftSlotTypes, total] = await Promise.all([
       this.shiftSlotTypesService.findByUserId(userId, skip, limit),
       this.shiftSlotTypesService.count(userId),
     ]);

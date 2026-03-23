@@ -1,6 +1,5 @@
 import { IsOptional, IsString, IsDateString, IsBoolean } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { PaginationDto } from '../../../common/dtos/pagination.dto';
 
 export class QueryShiftSlotEmployeeDto {
   @ApiPropertyOptional({

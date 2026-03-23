@@ -46,7 +46,7 @@ export class DepartmentsService {
         where: { id },
         data: updateDepartmentDto,
       });
-    } catch (error) {
+    } catch {
       throw new NotFoundException(`Department with ID ${id} not found`);
     }
   }
@@ -56,7 +56,7 @@ export class DepartmentsService {
       return await this.prisma.department.delete({
         where: { id },
       });
-    } catch (error) {
+    } catch {
       throw new NotFoundException(`Department with ID ${id} not found`);
     }
   }

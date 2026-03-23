@@ -460,7 +460,7 @@ export class KiotVietService {
             await this.searchInvoicesFromGoogleScript(searchValue);
           return googleScriptInvoices;
         }
-      } catch (error) {
+      } catch {
         return [];
       }
 
@@ -649,14 +649,6 @@ export class KiotVietService {
       subTotal: detail.total || 0,
       serialNumbers: detail.serialOrSku ? [detail.serialOrSku] : [],
     }));
-
-    // Map customer
-    const customer = {
-      id: 0, // Google Script không có customer id
-      name: data.customer.name || '',
-      contactNumber: data.customer.phone || '',
-      email: undefined,
-    };
 
     // Map warranty nếu có
     let warranty: WarrantyInfoDto | undefined;

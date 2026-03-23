@@ -19,7 +19,6 @@ import { EmployeesService } from './employees.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { Employee } from './entities/employee.entity';
-import { PaginationDto } from '../../common/dtos/pagination.dto';
 import { Prisma } from '@prisma/client';
 import { JwtPayload, User } from 'src/common/decorators/user.decorator';
 import { QueryEmployeeDto } from './dto/query-employee.dto';
@@ -56,8 +55,6 @@ export class EmployeesController {
     const { page, limit, branchId, departmentId } = queryDto;
     const skip = (page - 1) * limit;
 
-    let employees, total;
-
     const where: Prisma.EmployeeWhereInput = { userId };
     if (branchId) {
       where.branchId = branchId;
@@ -66,7 +63,7 @@ export class EmployeesController {
       where.departmentId = departmentId;
     }
 
-    [employees, total] = await Promise.all([
+    const [employees, total] = await Promise.all([
       this.employeesService.findAll(where, skip, limit),
       this.employeesService.count(where),
     ]);

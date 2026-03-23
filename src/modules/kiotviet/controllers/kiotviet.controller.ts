@@ -7,13 +7,7 @@ import {
   Post,
   Body,
 } from '@nestjs/common';
-import {
-  ApiTags,
-  ApiOperation,
-  ApiResponse,
-  ApiQuery,
-  ApiBody,
-} from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiResponse, ApiBody } from '@nestjs/swagger';
 import { Public } from '../../../common/decorators/public.decorator';
 import { KiotVietService } from '../services/kiotviet.service';
 import { SearchInvoiceDto } from '../dto/search-invoice.dto';

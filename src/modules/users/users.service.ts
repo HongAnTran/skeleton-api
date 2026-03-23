@@ -99,7 +99,7 @@ export class UsersService {
           departments: true,
         },
       });
-    } catch (error) {
+    } catch {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
   }
@@ -109,7 +109,7 @@ export class UsersService {
       return await this.prisma.user.delete({
         where: { id, account: { role: AccountRole.USER } },
       });
-    } catch (error) {
+    } catch {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
   }

@@ -56,7 +56,7 @@ export class BranchesService {
         where: { id },
         data: updateBranchDto,
       });
-    } catch (error) {
+    } catch {
       throw new NotFoundException(`Branch with ID ${id} not found`);
     }
   }
@@ -66,7 +66,7 @@ export class BranchesService {
       return await this.prisma.branch.delete({
         where: { id },
       });
-    } catch (error) {
+    } catch {
       throw new NotFoundException(`Branch with ID ${id} not found`);
     }
   }

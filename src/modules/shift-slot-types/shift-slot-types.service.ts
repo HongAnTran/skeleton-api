@@ -82,7 +82,7 @@ export class ShiftSlotTypesService {
           shiftSlots: true,
         },
       });
-    } catch (error) {
+    } catch {
       throw new NotFoundException(`ShiftSlotType with ID ${id} not found`);
     }
   }

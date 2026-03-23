@@ -13,14 +13,11 @@ import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { LeaveRequestsService } from './leave-requests.service';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
 import {
-  UpdateLeaveRequestDto,
-  ApproveLeaveRequestDto,
   RejectLeaveRequestDto,
   CancelLeaveRequestDto,
 } from './dto/update-leave-request.dto';
 import { QueryLeaveRequestDto } from './dto/query-leave-request.dto';
 import { LeaveRequest } from './entities/leave-request.entity';
-import { PaginationDto } from '../../common/dtos/pagination.dto';
 import { Prisma } from '@prisma/client';
 import { User, JwtPayload } from '../../common/decorators/user.decorator';
 

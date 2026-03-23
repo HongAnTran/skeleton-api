@@ -68,8 +68,6 @@ export class ShiftSlotsController {
       employeeId,
     } = queryDto;
     const userId = user.userId;
-    let shiftSlots, total;
-
     const where: Prisma.ShiftSlotWhereInput = {
       userId,
     };
@@ -96,7 +94,7 @@ export class ShiftSlotsController {
         lte: new Date(endDate),
       };
     }
-    [shiftSlots, total] = await Promise.all([
+    const [shiftSlots, total] = await Promise.all([
       this.shiftSlotsService.findAll(where, skip, limit),
       this.shiftSlotsService.count(where),
     ]);

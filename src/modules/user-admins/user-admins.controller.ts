@@ -53,14 +53,12 @@ export class UserAdminsController {
     const { page, limit, userId: queryUserId } = queryDto;
     const skip = (page - 1) * limit;
 
-    let userAdmins, total;
-
     const where: Prisma.UserAdminWhereInput = { userId };
     if (queryUserId) {
       where.userId = queryUserId;
     }
 
-    [userAdmins, total] = await Promise.all([
+    const [userAdmins, total] = await Promise.all([
       this.userAdminsService.findAll(where, skip, limit),
       this.userAdminsService.count(where),
     ]);

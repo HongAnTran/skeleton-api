@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsUUID } from 'class-validator';
+import { IsString, IsOptional } from 'class-validator';
 
 export class CreateShiftSwapRequestDto {
   @ApiProperty({ description: 'ID của nhân viên đích muốn đổi ca' })

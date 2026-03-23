@@ -2,16 +2,9 @@ import {
   Injectable,
   NotFoundException,
   BadRequestException,
-  ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../database/prisma.service';
 import { CreateLeaveRequestDto } from './dto/create-leave-request.dto';
-import {
-  UpdateLeaveRequestDto,
-  ApproveLeaveRequestDto,
-  RejectLeaveRequestDto,
-  CancelLeaveRequestDto,
-} from './dto/update-leave-request.dto';
 import { LeaveRequestStatus, Prisma } from '@prisma/client';
 
 @Injectable()

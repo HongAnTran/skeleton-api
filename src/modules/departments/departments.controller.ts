@@ -51,9 +51,7 @@ export class DepartmentsController {
     const skip = (page - 1) * limit;
     const userId = user.userId;
 
-    let departments, total;
-
-    [departments, total] = await Promise.all([
+    const [departments, total] = await Promise.all([
       this.departmentsService.findByUserId(userId, skip, limit),
       this.departmentsService.count(userId),
     ]);

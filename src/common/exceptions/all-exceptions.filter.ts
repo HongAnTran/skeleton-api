@@ -5,9 +5,6 @@ import {
   HttpException,
   HttpStatus,
   Logger,
-  ConflictException,
-  BadRequestException,
-  NotFoundException,
 } from '@nestjs/common';
 import { Request, Response } from 'express';
 import { Prisma } from '@prisma/client';

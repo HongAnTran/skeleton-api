@@ -299,7 +299,7 @@ export class ShiftSwapsService {
   }
 
   async update(id: string, updateDto: UpdateShiftSwapRequestDto) {
-    const swapRequest = await this.findOne(id);
+    await this.findOne(id);
 
     return this.prisma.shiftSwapRequest.update({
       where: { id },

@@ -1,8 +1,4 @@
-import {
-  Injectable,
-  NotFoundException,
-  BadRequestException,
-} from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../../database/prisma.service';
 import { CreateTaskDto } from '../dto/task-instance/create-task.dto';
 import { UpdateTaskInstanceDto } from '../dto/task-instance/update-task-instance.dto';
@@ -58,6 +54,13 @@ export class TaskService {
     return this.prisma.taskV2.findMany({
       where: {
         userId,
+        cycles: {
+          some: {
+            assignments: {
+              some: { employeeId },
+            },
+          },
+        },
       },
       include: {
         cycles: true,

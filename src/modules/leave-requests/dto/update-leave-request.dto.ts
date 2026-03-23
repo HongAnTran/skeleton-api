@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsOptional, IsEnum } from 'class-validator';
-import { LeaveRequestStatus } from '@prisma/client';
+import { IsString, IsOptional } from 'class-validator';
 
 export class UpdateLeaveRequestDto {
   @ApiProperty({

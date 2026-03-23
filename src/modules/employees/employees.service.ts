@@ -8,7 +8,6 @@ import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { PasswordUtil } from 'src/common/utils/password.util';
 import { Prisma, ShiftSignupStatus } from '@prisma/client';
-import { EmployeeShiftSummaryResponse } from './dto/employee-shift-summary.dto';
 
 @Injectable()
 export class EmployeesService {
@@ -185,7 +184,7 @@ export class EmployeesService {
       return await this.prisma.employee.delete({
         where: { id },
       });
-    } catch (error) {
+    } catch {
       throw new NotFoundException(`Employee with ID ${id} not found`);
     }
   }

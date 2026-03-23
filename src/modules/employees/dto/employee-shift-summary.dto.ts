@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsDateString, IsOptional } from 'class-validator';
+import { IsDateString } from 'class-validator';
 import { Employee } from '../entities/employee.entity';
 
 export class EmployeeShiftSummaryDto {

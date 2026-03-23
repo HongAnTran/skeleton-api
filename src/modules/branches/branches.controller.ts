@@ -47,9 +47,7 @@ export class BranchesController {
   ) {
     const { page, limit } = paginationDto;
     const skip = (page - 1) * limit;
-    let branches, total;
-
-    [branches, total] = await Promise.all([
+    const [branches, total] = await Promise.all([
       this.branchesService.findByUserId(user.userId, skip, limit),
       this.branchesService.count(user.userId),
     ]);

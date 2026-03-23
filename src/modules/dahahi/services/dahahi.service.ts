@@ -114,7 +114,6 @@ export class DahahiService {
   private buildCheckinReport(
     items: DahahiCheckinHistoryItemDto[],
   ): DahahiCheckinHistoryReportDto {
-    const gap = DahahiService.CHECKIN_CLUSTER_GAP_MS;
     const byDay = new Map<string, number[]>();
 
     for (const item of items) {

@@ -319,7 +319,7 @@ export class ShiftSignupsService {
       return await this.prisma.shiftSignup.delete({
         where: { id },
       });
-    } catch (error) {
+    } catch {
       throw new NotFoundException(`Shift signup with ID ${id} not found`);
     }
   }
@@ -384,7 +384,6 @@ export class ShiftSignupsService {
     // 4. Xác định tuần làm việc (từ thứ 2 đến CN)
     const dates = shiftSlots.map((slot) => new Date(slot.date));
     const minDate = new Date(Math.min(...dates.map((d) => d.getTime())));
-    const maxDate = new Date(Math.max(...dates.map((d) => d.getTime())));
 
     const weekStart = this.getWeekStart(minDate); // Thứ 2
     const weekEnd = this.getWeekEnd(minDate); // Chủ nhật

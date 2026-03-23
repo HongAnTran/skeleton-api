@@ -155,7 +155,7 @@ export class UserAdminsService {
       return await this.prisma.userAdmin.delete({
         where: { id },
       });
-    } catch (error) {
+    } catch {
       throw new NotFoundException(`UserAdmin with ID ${id} not found`);
     }
   }

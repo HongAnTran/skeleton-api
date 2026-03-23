@@ -81,14 +81,12 @@ export class ShiftSignupsController {
     const { page, limit } = paginationDto;
     const skip = (page - 1) * limit;
     const employeeId = user.employeeId;
-    let signups, total;
-
     const where: Prisma.ShiftSignupWhereInput = {};
     if (employeeId) {
       where.employeeId = employeeId;
     }
 
-    [signups, total] = await Promise.all([
+    const [signups, total] = await Promise.all([
       this.shiftSignupsService.findAll(where, skip, limit),
       this.shiftSignupsService.count(where),
     ]);
@@ -119,8 +117,6 @@ export class ShiftSignupsController {
     const { page, limit, startDate } = queryDto;
     const skip = (page - 1) * limit;
     const employeeId = queryDto.employeeId;
-    let signups, total;
-
     const where: Prisma.ShiftSignupWhereInput = {};
     where.employeeId = employeeId;
     where.canceledAt = null;
@@ -132,7 +128,7 @@ export class ShiftSignupsController {
       };
     }
 
-    [signups, total] = await Promise.all([
+    const [signups, total] = await Promise.all([
       this.shiftSignupsService.findAll(where, skip, limit),
       this.shiftSignupsService.count(where),
     ]);
