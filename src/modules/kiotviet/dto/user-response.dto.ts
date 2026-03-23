@@ -40,7 +40,8 @@ export class GetUsersResponseDto {
   pageSize: number;
 
   @ApiProperty({
-    description: 'Danh sách người dùng (đã xác nhận, không bao gồm Super Admin)',
+    description:
+      'Danh sách người dùng (đã xác nhận, không bao gồm Super Admin)',
     type: [KiotVietUserDto],
   })
   data: KiotVietUserDto[];

@@ -45,7 +45,10 @@ export class UserAdminsController {
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
   @ApiQuery({ name: 'userId', required: false, type: String })
-  async findAll(@User() user: JwtPayload, @Query() queryDto: QueryUserAdminDto) {
+  async findAll(
+    @User() user: JwtPayload,
+    @Query() queryDto: QueryUserAdminDto,
+  ) {
     const userId = user.userId;
     const { page, limit, userId: queryUserId } = queryDto;
     const skip = (page - 1) * limit;

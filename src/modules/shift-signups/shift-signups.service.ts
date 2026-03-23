@@ -505,7 +505,7 @@ export class ShiftSignupsService {
     approvedLeaves.forEach((leave) => {
       const start = this.getDateOnly(new Date(leave.startDate));
       const end = this.getDateOnly(new Date(leave.endDate));
-      let current = new Date(start);
+      const current = new Date(start);
       while (current <= end) {
         const dayStr = this.getDateOnly(current).toISOString();
         if (uniqueDaysInWeek.has(dayStr)) {

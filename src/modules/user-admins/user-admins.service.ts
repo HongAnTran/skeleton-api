@@ -127,7 +127,8 @@ export class UserAdminsService {
 
   async update(id: string, updateUserAdminDto: UpdateUserAdminDto) {
     try {
-      const { password, provider, email, ...userAdminData } = updateUserAdminDto;
+      const { password, provider, email, ...userAdminData } =
+        updateUserAdminDto;
       return await this.prisma.userAdmin.update({
         where: { id },
         data: {

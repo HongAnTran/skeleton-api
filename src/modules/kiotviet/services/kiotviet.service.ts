@@ -559,7 +559,7 @@ export class KiotVietService {
         ),
       );
 
-      let allInvoices = response.data?.data || [];
+      const allInvoices = response.data?.data || [];
 
       // Lọc các hóa đơn có chứa serial trong invoiceDetails
       const filteredInvoices = allInvoices.filter((invoice: any) => {

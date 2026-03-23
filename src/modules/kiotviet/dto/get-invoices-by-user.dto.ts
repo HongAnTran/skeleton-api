@@ -52,7 +52,8 @@ export class UserInvoicesReportDto {
   warrantyOrderCount: number;
 
   @ApiProperty({
-    description: 'Số lượng gói bảo hành đã bán (tổng quantity các dòng bảo hành)',
+    description:
+      'Số lượng gói bảo hành đã bán (tổng quantity các dòng bảo hành)',
   })
   warrantyQuantity: number;
 

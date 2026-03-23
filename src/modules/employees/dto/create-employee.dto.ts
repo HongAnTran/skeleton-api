@@ -62,7 +62,6 @@ export class CreateEmployeeDto {
   @IsString()
   provider?: string;
 
-
   @ApiProperty({ example: 'employee', required: false })
   @IsOptional()
   @IsString()
