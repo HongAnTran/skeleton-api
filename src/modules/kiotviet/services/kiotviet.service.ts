@@ -10,6 +10,7 @@ import { GetUsersResponseDto, KiotVietUserDto } from '../dto/user-response.dto';
 import { GetInvoicesByUserQueryDto } from '../dto/get-invoices-by-user.dto';
 import {
   GetInvoicesByUserResponseDto,
+  IphoneSalesReportDto,
   UserInvoicesReportDto,
 } from '../dto/get-invoices-by-user.dto';
 
@@ -38,6 +39,35 @@ interface KiotVietUsersApiResponse {
     }
   >;
   removeIds?: number[];
+}
+
+type IphoneMarketKind = 'lock' | 'international' | 'unknown';
+
+interface IphoneReportAgg {
+  totalIphoneUnits: number;
+  byMarket: { lock: number; international: number; unknown: number };
+  byModel: Map<
+    string,
+    {
+      quantity: number;
+      lock: number;
+      international: number;
+      unknown: number;
+    }
+  >;
+  byStorage: Map<string, number>;
+  byColor: Map<string, number>;
+  detailRows: Map<
+    string,
+    {
+      modelName: string;
+      storage: string;
+      color: string;
+      marketType: IphoneMarketKind;
+      productGroup?: string;
+      quantity: number;
+    }
+  >;
 }
 
 interface GoogleScriptInvoiceResponse {
@@ -282,6 +312,7 @@ export class KiotVietService {
       let warrantyRevenue = 0;
       let warrantyQuantity = 0;
       let iphoneQuantity = 0;
+      const iphoneAgg = this.createEmptyIphoneReportAgg();
       const warrantyBreakdownMap = new Map<
         string,
         {
@@ -308,6 +339,10 @@ export class KiotVietService {
           if (!this.isImeiLike(code)) return sum;
           return sum + Number(d?.quantity ?? 0);
         }, 0);
+
+        for (const d of nonWarrantyLines) {
+          this.accumulateIphoneReportLine(d, query, iphoneAgg);
+        }
 
         warrantyRevenue += warrantyLines.reduce(
           (sum: number, d: any) => sum + Number(d?.subTotal ?? 0),
@@ -378,6 +413,7 @@ export class KiotVietService {
           }),
         ),
         revenue: totalValue,
+        iphoneReport: this.finalizeIphoneReport(iphoneAgg),
       };
 
       return { data, report };
@@ -408,6 +444,176 @@ export class KiotVietService {
     const cleaned = String(input ?? '').replace(/[\s\-\(\)]/g, '');
     // IMEI thường là 15 số; thực tế có thể gặp dải 14-18 (tuỳ nguồn dữ liệu)
     return /^\d{14,18}$/.test(cleaned);
+  }
+
+  private createEmptyIphoneReportAgg(): IphoneReportAgg {
+    return {
+      totalIphoneUnits: 0,
+      byMarket: { lock: 0, international: 0, unknown: 0 },
+      byModel: new Map(),
+      byStorage: new Map(),
+      byColor: new Map(),
+      detailRows: new Map(),
+    };
+  }
+
+  /**
+   * Parse productName dạng "iPhone 16 Pro Max 256GB Desert Titanium"
+   * → model, dung lượng, màu (phần sau dung lượng).
+   */
+  private parseIphoneProductName(productName: string): {
+    modelName: string;
+    storage: string;
+    color: string;
+  } | null {
+    const raw = (productName || '').trim();
+    if (!/^iphone\s/i.test(raw)) return null;
+    const storageMatch = raw.match(/(\d+(?:\.\d+)?)(GB|TB)/i);
+    if (!storageMatch) return null;
+    const storageToken = `${storageMatch[1]}${storageMatch[2].toUpperCase()}`;
+    const idx = raw.indexOf(storageMatch[0]);
+    if (idx <= 0) return null;
+    const modelName = raw.slice(0, idx).trim();
+    const color = raw.slice(idx + storageMatch[0].length).trim();
+    if (!modelName || !color) return null;
+    return { modelName, storage: storageToken, color };
+  }
+
+  /**
+   * Lock: nhóm New L / Used L. Quốc tế: New Q / Used Q (theo productGroup KiotViet).
+   */
+  private classifyIphoneMarketFromGroup(
+    productGroup: string,
+  ): IphoneMarketKind {
+    const norm = (productGroup || '').trim().replace(/\s+/g, ' ');
+    if (!norm) return 'unknown';
+    const lockRe = /(?:^|[\s,/])(?:new|used)\s+L(?=\s|$|,|\/)/i;
+    const intlRe = /(?:^|[\s,/])(?:new|used)\s+Q(?=\s|$|,|\/)/i;
+    if (lockRe.test(norm)) return 'lock';
+    if (intlRe.test(norm)) return 'international';
+    if (/\block\b/i.test(norm) && !/(quốc\s*tế|quoc\s*te)/i.test(norm)) {
+      return 'lock';
+    }
+    if (/(quốc\s*tế|quoc\s*te)/i.test(norm)) return 'international';
+    return 'unknown';
+  }
+
+  private accumulateIphoneReportLine(
+    d: any,
+    query: GetInvoicesByUserQueryDto,
+    agg: IphoneReportAgg,
+  ): void {
+    const code = String(d?.productCode ?? '').trim();
+    if (!this.isImeiLike(code)) return;
+
+    const productName = String(d?.productName ?? '');
+    const filter = query.productNameContains?.trim();
+    if (filter && !productName.toLowerCase().includes(filter.toLowerCase())) {
+      return;
+    }
+
+    const parsed = this.parseIphoneProductName(productName);
+    if (!parsed) return;
+
+    const qty = Number(d?.quantity ?? 0);
+    if (!Number.isFinite(qty) || qty <= 0) return;
+
+    const productGroup = String(
+      d?.productGroup ?? d?.categoryName ?? '',
+    ).trim();
+    const market = this.classifyIphoneMarketFromGroup(productGroup);
+
+    agg.totalIphoneUnits += qty;
+    if (market === 'lock') agg.byMarket.lock += qty;
+    else if (market === 'international') agg.byMarket.international += qty;
+    else agg.byMarket.unknown += qty;
+
+    const m = agg.byModel.get(parsed.modelName) ?? {
+      quantity: 0,
+      lock: 0,
+      international: 0,
+      unknown: 0,
+    };
+    m.quantity += qty;
+    if (market === 'lock') m.lock += qty;
+    else if (market === 'international') m.international += qty;
+    else m.unknown += qty;
+    agg.byModel.set(parsed.modelName, m);
+
+    const stKey = parsed.storage;
+    agg.byStorage.set(stKey, (agg.byStorage.get(stKey) ?? 0) + qty);
+
+    const cKey = parsed.color;
+    agg.byColor.set(cKey, (agg.byColor.get(cKey) ?? 0) + qty);
+
+    const dKey = [parsed.modelName, parsed.storage, parsed.color, market].join(
+      '\0',
+    );
+    const existing = agg.detailRows.get(dKey);
+    if (existing) {
+      existing.quantity += qty;
+      if (!existing.productGroup && productGroup) {
+        existing.productGroup = productGroup;
+      }
+    } else {
+      agg.detailRows.set(dKey, {
+        modelName: parsed.modelName,
+        storage: parsed.storage,
+        color: parsed.color,
+        marketType: market,
+        productGroup: productGroup || undefined,
+        quantity: qty,
+      });
+    }
+  }
+
+  private finalizeIphoneReport(agg: IphoneReportAgg): IphoneSalesReportDto {
+    const byModel = Array.from(agg.byModel.entries())
+      .map(([modelName, v]) => ({
+        modelName,
+        quantity: v.quantity,
+        lockQuantity: v.lock,
+        internationalQuantity: v.international,
+        unknownMarketQuantity: v.unknown,
+      }))
+      .sort((a, b) => a.modelName.localeCompare(b.modelName, 'vi'));
+
+    const byStorage = Array.from(agg.byStorage.entries())
+      .map(([storage, quantity]) => ({ storage, quantity }))
+      .sort(
+        (a, b) =>
+          b.quantity - a.quantity || a.storage.localeCompare(b.storage, 'vi'),
+      );
+
+    const byColor = Array.from(agg.byColor.entries())
+      .map(([color, quantity]) => ({ color, quantity }))
+      .sort(
+        (a, b) =>
+          b.quantity - a.quantity || a.color.localeCompare(b.color, 'vi'),
+      );
+
+    const detailRows = Array.from(agg.detailRows.values()).sort((a, b) => {
+      const m = a.modelName.localeCompare(b.modelName, 'vi');
+      if (m !== 0) return m;
+      const s = a.storage.localeCompare(b.storage, 'vi');
+      if (s !== 0) return s;
+      const c = a.color.localeCompare(b.color, 'vi');
+      if (c !== 0) return c;
+      return a.marketType.localeCompare(b.marketType);
+    });
+
+    return {
+      totalIphoneUnits: agg.totalIphoneUnits,
+      byMarket: {
+        lockQuantity: agg.byMarket.lock,
+        internationalQuantity: agg.byMarket.international,
+        unknownMarketQuantity: agg.byMarket.unknown,
+      },
+      byModel,
+      byStorage,
+      byColor,
+      detailRows,
+    };
   }
 
   /**

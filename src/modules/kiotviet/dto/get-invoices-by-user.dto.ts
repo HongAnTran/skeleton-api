@@ -1,5 +1,11 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsInt, IsDateString, IsOptional, Min } from 'class-validator';
+import {
+  IsInt,
+  IsDateString,
+  IsOptional,
+  Min,
+  IsString,
+} from 'class-validator';
 import { Type } from 'class-transformer';
 import { InvoiceResponseDto } from './invoice-response.dto';
 
@@ -28,6 +34,113 @@ export class GetInvoicesByUserQueryDto {
   @IsOptional()
   @IsDateString()
   toPurchaseDate?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Chỉ tính vào báo cáo iPhone các dòng có productName chứa chuỗi này (không phân biệt hoa thường), ví dụ "16 Pro Max"',
+  })
+  @IsOptional()
+  @IsString()
+  productNameContains?: string;
+}
+
+export class IphoneMarketTotalsDto {
+  @ApiProperty({ description: 'Nhóm New L / Used L (Lock)' })
+  lockQuantity: number;
+
+  @ApiProperty({ description: 'Nhóm New Q / Used Q (Quốc tế)' })
+  internationalQuantity: number;
+
+  @ApiProperty({
+    description:
+      'Không xác định được nhóm (thiếu productGroup hoặc không khớp L/Q)',
+  })
+  unknownMarketQuantity: number;
+}
+
+export class IphoneModelBreakdownDto {
+  @ApiProperty({ example: 'iPhone 16 Pro Max' })
+  modelName: string;
+
+  @ApiProperty({ description: 'Tổng số máy (theo model)' })
+  quantity: number;
+
+  @ApiProperty({ description: 'Lock (L)' })
+  lockQuantity: number;
+
+  @ApiProperty({ description: 'Quốc tế (Q)' })
+  internationalQuantity: number;
+
+  @ApiProperty()
+  unknownMarketQuantity: number;
+}
+
+export class IphoneStorageBreakdownDto {
+  @ApiProperty({ example: '256GB' })
+  storage: string;
+
+  @ApiProperty()
+  quantity: number;
+}
+
+export class IphoneColorBreakdownDto {
+  @ApiProperty({ example: 'Desert Titanium' })
+  color: string;
+
+  @ApiProperty()
+  quantity: number;
+}
+
+export class IphoneDetailRowDto {
+  @ApiProperty({ example: 'iPhone 16 Pro Max' })
+  modelName: string;
+
+  @ApiProperty({ example: '256GB' })
+  storage: string;
+
+  @ApiProperty({ example: 'Desert Titanium' })
+  color: string;
+
+  @ApiProperty({
+    description: 'lock | international | unknown',
+    example: 'lock',
+  })
+  marketType: string;
+
+  @ApiProperty({
+    description: 'Nhóm hàng gốc từ KiotViet (nếu có)',
+    required: false,
+  })
+  productGroup?: string;
+
+  @ApiProperty()
+  quantity: number;
+}
+
+export class IphoneSalesReportDto {
+  @ApiProperty({
+    description:
+      'Tổng số máy iPhone trong báo cáo chi tiết (dòng IMEI, có parse được tên iPhone)',
+  })
+  totalIphoneUnits: number;
+
+  @ApiProperty({ type: IphoneMarketTotalsDto })
+  byMarket: IphoneMarketTotalsDto;
+
+  @ApiProperty({ type: [IphoneModelBreakdownDto] })
+  byModel: IphoneModelBreakdownDto[];
+
+  @ApiProperty({ type: [IphoneStorageBreakdownDto] })
+  byStorage: IphoneStorageBreakdownDto[];
+
+  @ApiProperty({ type: [IphoneColorBreakdownDto] })
+  byColor: IphoneColorBreakdownDto[];
+
+  @ApiProperty({
+    description: 'Chi tiết theo model + bộ nhớ + màu + loại Lock/QT',
+    type: [IphoneDetailRowDto],
+  })
+  detailRows: IphoneDetailRowDto[];
 }
 
 export class UserInvoicesReportDto {
@@ -79,6 +192,13 @@ export class UserInvoicesReportDto {
 
   @ApiProperty({ description: 'Doanh thu (bằng totalValue)' })
   revenue: number;
+
+  @ApiProperty({
+    description:
+      'Báo cáo iPhone: theo model (tên dòng máy), Lock/Quốc tế (nhóm L/Q), dung lượng và màu — parse từ productName dạng "iPhone 16 Pro Max 256GB Desert Titanium"',
+    type: IphoneSalesReportDto,
+  })
+  iphoneReport: IphoneSalesReportDto;
 }
 
 export class GetInvoicesByUserResponseDto {

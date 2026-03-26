@@ -79,7 +79,7 @@ export class KiotVietController {
   @ApiOperation({
     summary: 'Lấy danh sách hóa đơn do một user bán',
     description:
-      'Lấy toàn bộ hóa đơn trong khoảng thời gian (nếu truyền), lọc theo userId (soldById), trả về danh sách kèm báo cáo: tổng số đơn, tổng giá trị, số đơn có bảo hành, doanh thu.',
+      'Lấy toàn bộ hóa đơn trong khoảng thời gian (nếu truyền), lọc theo userId (soldById), trả về danh sách kèm báo cáo: tổng, doanh thu, bảo hành, và báo cáo iPhone theo model / Lock–Quốc tế (nhóm L,Q) / dung lượng / màu.',
   })
   @ApiResponse({
     status: 200,
