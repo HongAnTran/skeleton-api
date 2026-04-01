@@ -108,7 +108,7 @@ export class KiotVietService {
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
-  ) {}
+  ) { }
 
   private get retailer(): string {
     return this.configService.get<string>('KIOTVIET_RETAILER');
@@ -305,11 +305,11 @@ export class KiotVietService {
       const invoicesForReport =
         query.userId != null
           ? allInvoices.filter((inv) => {
-              const soldBy = (inv as any).soldById;
-              return (
-                soldBy != null && Number(soldBy) === Number(query.userId)
-              );
-            })
+            const soldBy = (inv as any).soldById;
+            return (
+              soldBy != null && Number(soldBy) === Number(query.userId)
+            );
+          })
           : allInvoices;
 
       // Tính report từ invoiceDetails trước khi calculateWarranty (vì calculateWarranty sẽ loại bỏ sản phẩm bảo hành)
@@ -395,7 +395,7 @@ export class KiotVietService {
       });
 
       const totalValue = data.reduce(
-        (sum, inv) => sum + (inv.totalPayment ?? 0),
+        (sum, inv) => sum + (inv.total ?? 0),
         0,
       );
       const warrantyOrderCount = data.filter(
