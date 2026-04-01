@@ -10,14 +10,16 @@ import { Type } from 'class-transformer';
 import { InvoiceResponseDto } from './invoice-response.dto';
 
 export class GetInvoicesByUserQueryDto {
-  @ApiProperty({
-    description: 'ID người dùng (nhân viên bán hàng)',
+  @ApiPropertyOptional({
+    description:
+      'ID người dùng (nhân viên bán hàng, soldById). Bỏ trống để lấy toàn bộ hóa đơn trong khoảng thời gian.',
     example: 12345,
   })
   @Type(() => Number)
+  @IsOptional()
   @IsInt()
   @Min(1)
-  userId: number;
+  userId?: number;
 
   @ApiPropertyOptional({
     description: 'Từ ngày giao dịch (ISO datetime)',

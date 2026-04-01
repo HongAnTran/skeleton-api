@@ -77,9 +77,9 @@ export class KiotVietController {
   @Public()
   @Get('invoices/by-user')
   @ApiOperation({
-    summary: 'Lấy danh sách hóa đơn do một user bán',
+    summary: 'Lấy danh sách hóa đơn (theo user hoặc toàn bộ)',
     description:
-      'Lấy toàn bộ hóa đơn trong khoảng thời gian (nếu truyền), lọc theo userId (soldById), trả về danh sách kèm báo cáo: tổng, doanh thu, bảo hành, và báo cáo iPhone theo model / Lock–Quốc tế (nhóm L,Q) / dung lượng / màu.',
+      'Lấy hóa đơn trong khoảng thời gian (nếu truyền). Có userId thì chỉ đơn do user đó bán (soldById); không có userId thì toàn bộ đơn trong khoảng thời gian. Trả về danh sách kèm báo cáo: tổng, doanh thu, bảo hành, và báo cáo iPhone theo model / Lock–Quốc tế (nhóm L,Q) / dung lượng / màu.',
   })
   @ApiResponse({
     status: 200,

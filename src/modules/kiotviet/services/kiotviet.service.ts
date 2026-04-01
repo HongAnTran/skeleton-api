@@ -243,8 +243,8 @@ export class KiotVietService {
   }
 
   /**
-   * Lấy toàn bộ hóa đơn trong khoảng thời gian (phân trang 100/item),
-   * sau đó lọc theo userId (soldById) và trả về kèm báo cáo.
+   * Lấy toàn bộ hóa đơn trong khoảng thời gian (phân trang 100/item).
+   * Nếu có userId thì lọc theo soldById; không có thì giữ toàn bộ và tính báo cáo trên tập đó.
    */
   async getInvoicesByUser(
     query: GetInvoicesByUserQueryDto,
@@ -301,11 +301,16 @@ export class KiotVietService {
         currentItem += pageSize;
       } while (true);
 
-      // Lọc theo userId (API không hỗ trợ filter soldById nên lọc phía backend)
-      const byUser = allInvoices.filter((inv) => {
-        const soldBy = (inv as any).soldById;
-        return soldBy != null && Number(soldBy) === Number(query.userId);
-      });
+      // Lọc theo userId khi có (API không hỗ trợ filter soldById nên lọc phía backend)
+      const invoicesForReport =
+        query.userId != null
+          ? allInvoices.filter((inv) => {
+              const soldBy = (inv as any).soldById;
+              return (
+                soldBy != null && Number(soldBy) === Number(query.userId)
+              );
+            })
+          : allInvoices;
 
       // Tính report từ invoiceDetails trước khi calculateWarranty (vì calculateWarranty sẽ loại bỏ sản phẩm bảo hành)
       let accessoryRevenue = 0;
@@ -323,7 +328,7 @@ export class KiotVietService {
         }
       >();
 
-      const data: InvoiceResponseDto[] = byUser.map((inv) => {
+      const data: InvoiceResponseDto[] = invoicesForReport.map((inv) => {
         const details = (inv as any).invoiceDetails ?? [];
 
         const warrantyLines = details.filter((d: any) =>
