@@ -137,11 +137,7 @@ export class KiotVietService {
    */
   async handleWebhookPayload(body: KiotVietWebhookExampleDto): Promise<void> {
     try {
-      this.logger.log('KiotViet webhook payload received', {
-        id: body?.Id,
-        attempt: body?.Attempt,
-        notificationCount: body?.Notifications?.length ?? 0,
-      });
+
 
       const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
       const chatId = this.configService.get<string>('TELEGRAM_GROUP_CHAT_ID');
@@ -153,10 +149,6 @@ export class KiotVietService {
       }
 
       for (const notification of body.Notifications ?? []) {
-        if (notification.Action !== 'invoice.update') {
-          this.logger.debug(`Bỏ qua webhook action: ${notification.Action}`);
-          continue;
-        }
         for (const invoice of notification.Data ?? []) {
           const html = this.buildSaleNotificationTelegramHtml(invoice);
           await this.sendTelegramMessage(token.trim(), chatId.trim(), html);
