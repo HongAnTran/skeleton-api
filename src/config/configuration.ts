@@ -39,6 +39,10 @@ export default () => ({
     clientId: process.env.KIOTVIET_CLIENT_ID,
     clientSecret: process.env.KIOTVIET_CLIENT_SECRET,
   },
+  telegram: {
+    botToken: process.env.TELEGRAM_BOT_TOKEN,
+    groupChatId: process.env.TELEGRAM_GROUP_CHAT_ID,
+  },
   dahahi: {
     baseUrl: process.env.DAHAHI_BASE_URL,
     appKey: process.env.DAHAHI_APP_KEY,

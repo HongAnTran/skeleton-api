@@ -90,6 +90,14 @@ class EnvironmentVariables {
   @IsString()
   @IsOptional()
   KIOTVIET_CLIENT_SECRET: string;
+
+  @IsString()
+  @IsOptional()
+  TELEGRAM_BOT_TOKEN: string;
+
+  @IsString()
+  @IsOptional()
+  TELEGRAM_GROUP_CHAT_ID: string;
 }
 
 export function validate(config: Record<string, unknown>) {

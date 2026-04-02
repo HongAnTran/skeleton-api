@@ -95,6 +95,13 @@ export class KiotVietWebhookInvoiceDetailDto {
 
   @ApiPropertyOptional()
   DiscountRatio?: number;
+
+  /** Một số cửa hàng map IMEI/serial vào đây (webhook có thể có thêm field từ KiotViet). */
+  @ApiPropertyOptional({ type: [String], description: 'Danh sách serial/IMEI' })
+  SerialNumbers?: string[];
+
+  @ApiPropertyOptional({ description: 'Ghi chú / mô tả dòng hàng (ví dụ tình trạng máy)' })
+  Note?: string;
 }
 
 /** Thanh toán. */

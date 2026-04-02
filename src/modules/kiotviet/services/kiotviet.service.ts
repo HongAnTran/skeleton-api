@@ -2,6 +2,7 @@ import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createHmac } from 'crypto';
 import { HttpService } from '@nestjs/axios';
+import { Telegraf } from 'telegraf';
 import { firstValueFrom } from 'rxjs';
 import { SearchInvoiceDto } from '../dto/search-invoice.dto';
 import { InvoiceResponseDto } from '../dto/invoice-response.dto';
@@ -14,7 +15,11 @@ import {
   IphoneSalesReportDto,
   UserInvoicesReportDto,
 } from '../dto/get-invoices-by-user.dto';
-import { KiotVietWebhookExampleDto } from 'src/modules/kiotviet/dto/kiotviet-webhook.dto';
+import {
+  KiotVietWebhookExampleDto,
+  KiotVietWebhookInvoiceDataDto,
+  KiotVietWebhookInvoiceDetailDto,
+} from 'src/modules/kiotviet/dto/kiotviet-webhook.dto';
 
 interface KiotVietTokenResponse {
   access_token: string;
@@ -106,6 +111,9 @@ export class KiotVietService {
   private readonly baseUrl = 'https://public.kiotapi.com';
   private accessToken: string | null = null;
   private tokenExpiresAt: number = 0;
+  /** Telegraf chỉ dùng `telegram.sendMessage` (không `launch`). */
+  private telegramBot: Telegraf | null = null;
+  private telegramBotToken: string | null = null;
 
   constructor(
     private readonly httpService: HttpService,
@@ -124,12 +132,161 @@ export class KiotVietService {
     return this.configService.get<string>('KIOTVIET_CLIENT_SECRET');
   }
 
-
   /**
-   * Xử lý payload sau khi đã xác minh chữ ký (mở rộng đồng bộ hóa tại đây).
+   * Xử lý payload sau khi đã xác minh chữ ký: gửi thông báo bán hàng vào group Telegram (nếu đã cấu hình).
    */
   async handleWebhookPayload(body: KiotVietWebhookExampleDto): Promise<void> {
-    this.logger.log('KiotViet webhook payload', body);
+    try {
+      this.logger.log('KiotViet webhook payload received', {
+        id: body?.Id,
+        attempt: body?.Attempt,
+        notificationCount: body?.Notifications?.length ?? 0,
+      });
+
+      const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
+      const chatId = this.configService.get<string>('TELEGRAM_GROUP_CHAT_ID');
+      if (!token?.trim() || !chatId?.trim()) {
+        this.logger.warn(
+          'Chưa cấu hình TELEGRAM_BOT_TOKEN hoặc TELEGRAM_GROUP_CHAT_ID — bỏ qua gửi Telegram',
+        );
+        return;
+      }
+
+      for (const notification of body.Notifications ?? []) {
+        if (notification.Action !== 'invoice.update') {
+          this.logger.debug(`Bỏ qua webhook action: ${notification.Action}`);
+          continue;
+        }
+        for (const invoice of notification.Data ?? []) {
+          const html = this.buildSaleNotificationTelegramHtml(invoice);
+          await this.sendTelegramMessage(token.trim(), chatId.trim(), html);
+        }
+      }
+    } catch (error) {
+      this.logger.error('handleWebhookPayload failed', error);
+    }
+  }
+
+  private getTelegraf(botToken: string): Telegraf {
+    if (this.telegramBotToken !== botToken || !this.telegramBot) {
+      this.telegramBot = new Telegraf(botToken);
+      this.telegramBotToken = botToken;
+    }
+    return this.telegramBot;
+  }
+
+  private escapeTelegramHtml(text: string): string {
+    return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  /** dd/mm/yyyy theo Asia/Ho_Chi_Minh */
+  private formatSaleDateVi(isoDate: string | undefined): string {
+    const d = isoDate ? new Date(isoDate) : new Date();
+    if (Number.isNaN(d.getTime())) return this.formatSaleDateVi(undefined);
+    return d.toLocaleDateString('en-GB', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      timeZone: 'Asia/Ho_Chi_Minh',
+    });
+  }
+
+  private lineImeiOrSerial(detail: KiotVietWebhookInvoiceDetailDto): string {
+    const serials = detail.SerialNumbers?.filter(Boolean).join(', ');
+    if (serials) return serials;
+    const raw = detail as KiotVietWebhookInvoiceDetailDto & {
+      SerialNumber?: string;
+      IMEI?: string;
+    };
+    if (raw.SerialNumber?.trim()) return raw.SerialNumber.trim();
+    if (raw.IMEI?.trim()) return raw.IMEI.trim();
+    return detail.ProductCode?.trim() || '—';
+  }
+
+  private buildProductSectionHtml(invoice: KiotVietWebhookInvoiceDataDto): string {
+    const lines = invoice.InvoiceDetails ?? [];
+    if (lines.length === 0) return '+ <i>Không có dòng sản phẩm</i>';
+
+    return lines
+      .map((d, i) => {
+        const name = this.escapeTelegramHtml(d.ProductName || '—');
+        const imei = this.escapeTelegramHtml(this.lineImeiOrSerial(d));
+        const note = d.Note?.trim()
+          ? this.escapeTelegramHtml(d.Note.trim())
+          : '—';
+        const qty = d.Quantity ?? 0;
+        return (
+          `<b>+ ${i + 1}. ${name}</b>\n` +
+          `+ Số lượng: ${qty}\n` +
+          `+ Số IMEI / serial: ${imei}\n` +
+          `+ Tình trạng / ghi chú dòng: ${note}\n`
+        );
+      })
+      .join('\n');
+  }
+
+  private buildCustomerSectionHtml(invoice: KiotVietWebhookInvoiceDataDto): string {
+    const parts: string[] = [];
+    parts.push(`+ Tên: ${this.escapeTelegramHtml(invoice.CustomerName || '—')}`);
+    parts.push(`+ Mã KH: ${this.escapeTelegramHtml(invoice.CustomerCode || '—')}`);
+    const del = invoice.InvoiceDelivery;
+    if (del?.ContactNumber?.trim()) {
+      parts.push(`+ SĐT (giao hàng): ${this.escapeTelegramHtml(del.ContactNumber.trim())}`);
+    }
+    if (del?.Receiver?.trim()) {
+      parts.push(`+ Người nhận: ${this.escapeTelegramHtml(del.Receiver.trim())}`);
+    }
+    if (del?.Address?.trim()) {
+      parts.push(`+ Địa chỉ: ${this.escapeTelegramHtml(del.Address.trim())}`);
+    }
+    parts.push(`+ Mã HĐ: ${this.escapeTelegramHtml(invoice.Code || '—')}`);
+    parts.push(`+ Trạng thái đơn: ${this.escapeTelegramHtml(invoice.StatusValue || '—')}`);
+    parts.push(`+ Chi nhánh: ${this.escapeTelegramHtml(invoice.BranchName || '—')}`);
+    return parts.join('\n');
+  }
+
+  /**
+   * Nội dung HTML (parse_mode HTML) tương ứng mẫu tin nhắn bán hàng.
+   * Gói bảo hành/phụ kiện: webhook KiotViet chuẩn không tách sẵn — nhắc xem chi tiết trên KiotViet.
+   */
+  private buildSaleNotificationTelegramHtml(
+    invoice: KiotVietWebhookInvoiceDataDto,
+  ): string {
+    const saleDate = this.formatSaleDateVi(invoice.PurchaseDate);
+    const staff = this.escapeTelegramHtml(invoice.SoldByName || '—');
+    const products = this.buildProductSectionHtml(invoice);
+    const warrantyBlock =
+      '<i>Webhook không gửi riêng gói bảo hành/phụ kiện — vui lòng đối chiếu mã HĐ trên KiotViet.</i>';
+    const invoiceNote = invoice.Description?.trim()
+      ? this.escapeTelegramHtml(invoice.Description.trim())
+      : '—';
+    const customer = this.buildCustomerSectionHtml(invoice);
+
+    return (
+      `<b>NGÀY BÁN HÀNG:</b> ${this.escapeTelegramHtml(saleDate)}\n\n` +
+      `<b>NHÂN VIÊN BÁN HÀNG:</b> ${staff}\n\n` +
+      `<b>THÔNG TIN SẢN PHẨM:</b>\n${products}\n\n` +
+      `<b>THÔNG TIN VỀ GÓI BẢO HÀNH VÀ PHỤ KIỆN:</b>\n${warrantyBlock}\n\n` +
+      `<b>GHI CHÚ TỪ HOÁ ĐƠN:</b>\n${invoiceNote}\n\n` +
+      `<b>THÔNG TIN KHÁCH HÀNG TỪ ĐƠN HÀNG:</b>\n${customer}`
+    );
+  }
+
+  private async sendTelegramMessage(
+    botToken: string,
+    chatId: string,
+    text: string,
+  ): Promise<void> {
+
+    try {
+      const bot = this.getTelegraf(botToken);
+      await bot.telegram.sendMessage(chatId, text, {
+        parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
+      });
+    } catch (error) {
+      this.logger.error('Gửi Telegram thất bại', error);
+    }
   }
 
   /**
