@@ -312,6 +312,13 @@ export class KiotVietService {
           })
           : allInvoices;
 
+      const exchangeInvoiceCount = invoicesForReport.filter((inv) =>
+        this.isExchangeInvoiceCode(inv.code),
+      ).length;
+      const invoicesEligible = invoicesForReport.filter(
+        (inv) => !this.isExchangeInvoiceCode(inv.code),
+      );
+
       // Tính report từ invoiceDetails trước khi calculateWarranty (vì calculateWarranty sẽ loại bỏ sản phẩm bảo hành)
       let accessoryRevenue = 0;
       let warrantyRevenue = 0;
@@ -328,7 +335,7 @@ export class KiotVietService {
         }
       >();
 
-      const data: InvoiceResponseDto[] = invoicesForReport.map((inv) => {
+      const data: InvoiceResponseDto[] = invoicesEligible.map((inv) => {
         const details = (inv as any).invoiceDetails ?? [];
 
         const warrantyLines = details.filter((d: any) =>
@@ -408,6 +415,7 @@ export class KiotVietService {
         accessoryRevenue,
         warrantyRevenue,
         warrantyOrderCount,
+        exchangeInvoiceCount,
         warrantyQuantity,
         warrantyBreakdown: Array.from(warrantyBreakdownMap.values()).map(
           (x) => ({
@@ -449,6 +457,14 @@ export class KiotVietService {
     const cleaned = String(input ?? '').replace(/[\s\-\(\)]/g, '');
     // IMEI thường là 15 số; thực tế có thể gặp dải 14-18 (tuỳ nguồn dữ liệu)
     return /^\d{14,18}$/.test(cleaned);
+  }
+
+  /**
+   * Hóa đơn đổi: mã bắt đầu bằng HDD và có hậu tố _TH + chuỗi số (ví dụ HDD_TH000073).
+   */
+  private isExchangeInvoiceCode(code: string | undefined | null): boolean {
+    const c = String(code ?? '').trim();
+    return /^hdd.*_th\d+$/i.test(c);
   }
 
   private createEmptyIphoneReportAgg(): IphoneReportAgg {

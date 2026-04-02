@@ -168,6 +168,13 @@ export class UserInvoicesReportDto {
 
   @ApiProperty({
     description:
+      'Số hóa đơn đổi (mã bắt đầu HDD và hậu tố _TH + số, ví dụ HDD_TH000073). Không nằm trong `data` và không tính vào các chỉ số báo cáo khác.',
+    example: 2,
+  })
+  exchangeInvoiceCount: number;
+
+  @ApiProperty({
+    description:
       'Số lượng gói bảo hành đã bán (tổng quantity các dòng bảo hành)',
   })
   warrantyQuantity: number;
