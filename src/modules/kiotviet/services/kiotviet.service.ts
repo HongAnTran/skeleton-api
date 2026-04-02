@@ -1,5 +1,6 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { createHmac } from 'crypto';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { SearchInvoiceDto } from '../dto/search-invoice.dto';
@@ -13,6 +14,7 @@ import {
   IphoneSalesReportDto,
   UserInvoicesReportDto,
 } from '../dto/get-invoices-by-user.dto';
+import { KiotVietWebhookExampleDto } from 'src/modules/kiotviet/dto/kiotviet-webhook.dto';
 
 interface KiotVietTokenResponse {
   access_token: string;
@@ -120,6 +122,14 @@ export class KiotVietService {
 
   private get clientSecret(): string {
     return this.configService.get<string>('KIOTVIET_CLIENT_SECRET');
+  }
+
+
+  /**
+   * Xử lý payload sau khi đã xác minh chữ ký (mở rộng đồng bộ hóa tại đây).
+   */
+  async handleWebhookPayload(body: KiotVietWebhookExampleDto): Promise<void> {
+    this.logger.log('KiotViet webhook payload', body);
   }
 
   /**

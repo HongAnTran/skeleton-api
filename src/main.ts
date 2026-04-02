@@ -13,7 +13,9 @@ async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
   try {
-    const app = await NestFactory.create(AppModule);
+    const app = await NestFactory.create(AppModule, {
+      rawBody: true,
+    });
     const configService = app.get(ConfigService);
     const appConfig = configService.get<AppConfig>('app');
 
@@ -32,7 +34,12 @@ async function bootstrap() {
       origin: '*',
       credentials: true,
       methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-API-KEY'],
+      allowedHeaders: [
+        'Content-Type',
+        'Authorization',
+        'X-API-KEY',
+        'X-Hub-Signature',
+      ],
     });
     logger.log('✅ CORS enabled for origins: *');
 
