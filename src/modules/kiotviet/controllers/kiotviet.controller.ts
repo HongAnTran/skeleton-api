@@ -24,7 +24,7 @@ import {
   GetInvoicesByUserQueryDto,
   GetInvoicesByUserResponseDto,
 } from '../dto/get-invoices-by-user.dto';
-import { KiotVietWebhookExampleDto } from 'src/modules/kiotviet/dto/kiotviet-webhook.dto';
+import { KiotVietWebhookExampleDto } from '../dto/kiotviet-webhook.dto';
 
 @ApiTags('KiotViet - Tra cứu bảo hành')
 @Controller('kiotviet')
@@ -107,31 +107,13 @@ export class KiotVietController {
   @SkipThrottle()
   @Post('webhook')
   @HttpCode(HttpStatus.OK)
-  @ApiHeader({
-    name: 'X-Hub-Signature',
-    required: true,
-    description:
-      'Chữ ký HMAC-SHA256 dạng hex (có thể có tiền tố sha256=) từ secret và raw body.',
-  })
-  @ApiOperation({
-    summary: 'Webhook KiotViet',
-    description:
-      'Nhận sự kiện từ KiotViet. So khớp X-Hub-Signature với HMAC-SHA256(secret, raw body). Chữ ký sai → 401 (KiotViet sẽ ngưng gửi nếu trả 4xx). Cấu hình secret: KIOTVIET_WEBHOOK_SECRET.',
-  })
   @ApiBody({ type: KiotVietWebhookExampleDto })
-  @ApiResponse({ status: 200, description: 'Đã nhận và xác minh webhook' })
-  @ApiResponse({
-    status: 401,
-    description: 'Thiếu/ sai X-Hub-Signature hoặc không đọc được body để xác minh',
-  })
-  @ApiResponse({
-    status: 503,
-    description: 'Chưa cấu hình KIOTVIET_WEBHOOK_SECRET trên server',
-  })
+  @ApiResponse({ status: 200, description: 'Đã nhận webhook' })
   kiotVietWebhook(
-    @Body() body: KiotVietWebhookExampleDto,
+    /** Object/Record: không qua forbidNonWhitelisted của ValidationPipe toàn cục (payload KiotViet có thể có field thêm). */
+    @Body() body: any,
   ): { ok: true } {
-    this.kiotVietService.handleWebhookPayload(body);
+    this.kiotVietService.handleWebhookPayload(body as KiotVietWebhookExampleDto);
     return { ok: true };
   }
 }
