@@ -137,8 +137,6 @@ export class KiotVietService {
    */
   async handleWebhookPayload(body: KiotVietWebhookExampleDto): Promise<void> {
     try {
-
-
       const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
       const chatId = this.configService.get<string>('TELEGRAM_GROUP_CHAT_ID');
       if (!token?.trim() || !chatId?.trim()) {
@@ -148,9 +146,18 @@ export class KiotVietService {
         return;
       }
 
+      /** 1: hoàn thành, 2: đã hủy (KiotVietWebhookInvoiceDataDto). */
+      const NOTIFY_STATUSES = new Set([1, 2]);
+
       for (const notification of body.Notifications ?? []) {
         for (const invoice of notification.Data ?? []) {
-          const html = this.buildSaleNotificationTelegramHtml(invoice);
+          if (!NOTIFY_STATUSES.has(invoice.Status)) {
+            continue;
+          }
+          const html =
+            invoice.Status === 2
+              ? this.buildCancelledInvoiceTelegramHtml(invoice)
+              : this.buildSaleNotificationTelegramHtml(invoice);
           await this.sendTelegramMessage(token.trim(), chatId.trim(), html);
         }
       }
@@ -195,9 +202,26 @@ export class KiotVietService {
     return detail.ProductCode?.trim() || '—';
   }
 
+  /** Chỉ sản phẩm chính (máy): bỏ gói bảo hành và phụ kiện — cùng tiêu chí phần bảo hành/phụ kiện. */
+  private filterMainProductLines(
+    details: KiotVietWebhookInvoiceDetailDto[],
+  ): KiotVietWebhookInvoiceDetailDto[] {
+    return details.filter((d) => {
+      if (this.isWarrantyProduct(d.ProductName || '')) return false;
+      const code = String(d.ProductCode ?? '').trim();
+      if (!this.isImeiLike(code)) return false;
+      return true;
+    });
+  }
+
   private buildProductSectionHtml(invoice: KiotVietWebhookInvoiceDataDto): string {
-    const lines = invoice.InvoiceDetails ?? [];
-    if (lines.length === 0) return '+ <i>Không có dòng sản phẩm</i>';
+    const allLines = invoice.InvoiceDetails ?? [];
+    if (allLines.length === 0) return '+ <i>Không có dòng sản phẩm</i>';
+
+    const lines = this.filterMainProductLines(allLines);
+    if (lines.length === 0) {
+      return '+ <i>Không có dòng sản phẩm chính — toàn bộ là bảo hành/phụ kiện hoặc chưa có mã IMEI trên mã SP.</i>';
+    }
 
     return lines
       .map((d, i) => {
@@ -237,9 +261,103 @@ export class KiotVietService {
     return parts.join('\n');
   }
 
+  /** Hóa đơn đã hủy: chỉ báo mã HĐ + nhân viên. */
+  private buildCancelledInvoiceTelegramHtml(
+    invoice: KiotVietWebhookInvoiceDataDto,
+  ): string {
+    const code = this.escapeTelegramHtml(invoice.Code || '—');
+    const staff = this.escapeTelegramHtml(invoice.SoldByName || '—');
+    return (
+      `Hóa đơn mã <b>${code}</b> được bán bởi <b>${staff}</b> đã bị hủy.`
+    );
+  }
+
+  /**
+   * Bảo hành + phụ kiện từ InvoiceDetails (cùng tiêu chí isWarrantyProduct / bậc ngày như calculateWarranty;
+   * phụ kiện: dòng không phải bảo hành và mã không dạng IMEI, giống logic báo cáo).
+   */
+  private buildWarrantyAndAccessorySectionHtml(
+    invoice: KiotVietWebhookInvoiceDataDto,
+  ): string {
+    const details = invoice.InvoiceDetails ?? [];
+    const warrantyLines = details.filter((d) =>
+      this.isWarrantyProduct(d.ProductName || ''),
+    );
+    const accessoryLines = details.filter((d) => {
+      if (this.isWarrantyProduct(d.ProductName || '')) return false;
+      const code = String(d.ProductCode ?? '').trim();
+      if (this.isImeiLike(code)) return false;
+      return true;
+    });
+
+    const parts: string[] = [];
+
+    if (warrantyLines.length > 0) {
+      parts.push('<b>Gói bảo hành:</b>');
+      for (const d of warrantyLines) {
+        const name = this.escapeTelegramHtml(d.ProductName || '—');
+        const qty = d.Quantity ?? 0;
+        const price = d.Price ?? 0;
+        const sub = price * qty;
+        const money =
+          sub > 0 ? ` — ${sub.toLocaleString('vi-VN')} đ` : '';
+        parts.push(`+ ${name} (SL: ${qty})${money}`);
+      }
+
+      const warrantyTypes: Array<{ name: string; days: number }> = [
+        { name: 'Bảo Hành CARE⁺ PRO MAX', days: 365 },
+        { name: 'Bảo Hành CARE⁺ PRO', days: 180 },
+        { name: 'Bảo Hành Mở Rộng', days: 90 },
+        { name: 'Bảo Hành Tiết Kiệm', days: 0 },
+      ];
+      let warrantyDays = 0;
+      let warrantyType = '';
+      for (const detail of warrantyLines) {
+        const productName = (detail.ProductName || '').toLowerCase();
+        for (const warranty of warrantyTypes) {
+          const warrantyNameLower = warranty.name.toLowerCase();
+          if (productName.includes(warrantyNameLower)) {
+            if (warranty.days > warrantyDays) {
+              warrantyDays = warranty.days;
+              warrantyType = warranty.name;
+            }
+            break;
+          }
+        }
+      }
+
+      if (warrantyDays > 0) {
+        const typeEsc = this.escapeTelegramHtml(warrantyType);
+        parts.push('');
+        parts.push(`+ Loại áp dụng: <b>${typeEsc}</b> (${warrantyDays} ngày)`)
+      }
+    }
+
+    if (accessoryLines.length > 0) {
+      if (parts.length > 0) parts.push('');
+      parts.push('<b>Phụ kiện kèm đơn:</b>');
+      for (const d of accessoryLines) {
+        const name = this.escapeTelegramHtml(d.ProductName || '—');
+        const qty = d.Quantity ?? 0;
+        const price = d.Price ?? 0;
+        const sub = price * qty;
+        const money =
+          sub > 0 ? ` — ${sub.toLocaleString('vi-VN')} đ` : '';
+        parts.push(`+ ${name} (SL: ${qty})${money}`);
+      }
+    }
+
+    if (parts.length === 0) {
+      return (
+        '<i>Không phát hiện dòng bảo hành/phụ kiện tách biệt trên đơn — vui lòng đối chiếu mã HĐ trên KiotViet.</i>'
+      );
+    }
+
+    return parts.join('\n');
+  }
+
   /**
    * Nội dung HTML (parse_mode HTML) tương ứng mẫu tin nhắn bán hàng.
-   * Gói bảo hành/phụ kiện: webhook KiotViet chuẩn không tách sẵn — nhắc xem chi tiết trên KiotViet.
    */
   private buildSaleNotificationTelegramHtml(
     invoice: KiotVietWebhookInvoiceDataDto,
@@ -247,8 +365,7 @@ export class KiotVietService {
     const saleDate = this.formatSaleDateVi(invoice.PurchaseDate);
     const staff = this.escapeTelegramHtml(invoice.SoldByName || '—');
     const products = this.buildProductSectionHtml(invoice);
-    const warrantyBlock =
-      '<i>Webhook không gửi riêng gói bảo hành/phụ kiện — vui lòng đối chiếu mã HĐ trên KiotViet.</i>';
+    const warrantyBlock = this.buildWarrantyAndAccessorySectionHtml(invoice);
     const invoiceNote = invoice.Description?.trim()
       ? this.escapeTelegramHtml(invoice.Description.trim())
       : '—';
