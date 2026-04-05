@@ -261,7 +261,8 @@ export class KiotVietService {
         return (
           `<b>${name}</b>\n` +
           `${descriptionLine}\n` +
-          `${imei}\n`
+          `${imei}\n` +
+          `${d.Price}k\n`
         );
       }),
     );
@@ -332,7 +333,6 @@ export class KiotVietService {
     const parts: string[] = [];
 
     if (warrantyLines.length > 0) {
-      parts.push('<b>Gói bảo hành:</b>');
       for (const d of warrantyLines) {
         const name = this.escapeTelegramHtml(d.ProductName || '—');
         const qty = d.Quantity ?? 0;
@@ -340,59 +340,30 @@ export class KiotVietService {
         const sub = price * qty;
         const money =
           sub > 0 ? ` — ${sub.toLocaleString('vi-VN')} đ` : '';
-        parts.push(`+ ${name} (SL: ${qty})${money}`);
+        parts.push(`${name} ${money}`);
       }
 
-      const warrantyTypes: Array<{ name: string; days: number }> = [
-        { name: 'Bảo Hành CARE⁺ PRO MAX', days: 365 },
-        { name: 'Bảo Hành CARE⁺ PRO', days: 180 },
-        { name: 'Bảo Hành Mở Rộng', days: 90 },
-        { name: 'Bảo Hành Tiết Kiệm', days: 0 },
-      ];
-      let warrantyDays = 0;
-      let warrantyType = '';
-      for (const detail of warrantyLines) {
-        const productName = (detail.ProductName || '').toLowerCase();
-        for (const warranty of warrantyTypes) {
-          const warrantyNameLower = warranty.name.toLowerCase();
-          if (productName.includes(warrantyNameLower)) {
-            if (warranty.days > warrantyDays) {
-              warrantyDays = warranty.days;
-              warrantyType = warranty.name;
-            }
-            break;
-          }
+      if (accessoryLines.length > 0) {
+        if (parts.length > 0) parts.push('');
+        for (const d of accessoryLines) {
+          const name = this.escapeTelegramHtml(d.ProductName || '—');
+          const qty = d.Quantity ?? 0;
+          const price = d.Price ?? 0;
+          const sub = price * qty;
+          const money =
+            sub > 0 ? ` — ${sub.toLocaleString('vi-VN')} đ` : '';
+          parts.push(`+ ${name} ${money}`);
         }
       }
 
-      if (warrantyDays > 0) {
-        const typeEsc = this.escapeTelegramHtml(warrantyType);
-        parts.push('');
-        parts.push(`+ Loại áp dụng: <b>${typeEsc}</b> (${warrantyDays} ngày)`)
+      if (parts.length === 0) {
+        return (
+          ''
+        );
       }
-    }
 
-    if (accessoryLines.length > 0) {
-      if (parts.length > 0) parts.push('');
-      parts.push('<b>Phụ kiện kèm đơn:</b>');
-      for (const d of accessoryLines) {
-        const name = this.escapeTelegramHtml(d.ProductName || '—');
-        const qty = d.Quantity ?? 0;
-        const price = d.Price ?? 0;
-        const sub = price * qty;
-        const money =
-          sub > 0 ? ` — ${sub.toLocaleString('vi-VN')} đ` : '';
-        parts.push(`+ ${name} (SL: ${qty})${money}`);
-      }
+      return parts.join('\n');
     }
-
-    if (parts.length === 0) {
-      return (
-        '<i>Không phát hiện dòng bảo hành/phụ kiện tách biệt trên đơn — vui lòng đối chiếu mã HĐ trên KiotViet.</i>'
-      );
-    }
-
-    return parts.join('\n');
   }
 
   /**
