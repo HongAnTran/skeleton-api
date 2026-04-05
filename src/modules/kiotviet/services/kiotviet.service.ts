@@ -246,7 +246,7 @@ export class KiotVietService {
     invoice: KiotVietWebhookInvoiceDataDto,
   ): Promise<string> {
     const allLines = invoice.InvoiceDetails ?? [];
-    if (allLines.length === 0) return '+ <i>Không có dòng sản phẩm</i>';
+    if (allLines.length === 0) return '—';
 
     const lines = this.filterMainProductLines(allLines);
     if (lines.length === 0) {
@@ -258,16 +258,19 @@ export class KiotVietService {
         const name = this.escapeTelegramHtml(d.ProductName || '—');
         const imei = this.escapeTelegramHtml(this.lineImeiOrSerial(d));
         const descriptionLine = await this.fetchProductDescriptionForLine(d);
-        return (
-          `<b>${name}</b>\n` +
-          `${descriptionLine}\n` +
-          `${imei}\n` +
-          `${d.Price}k\n`
-        );
+        const desc = descriptionLine?.trim();
+        let block =
+          `<b>Tên Sản Phẩm:</b> ${name}\n` +
+          `<b>Số IMEI:</b> ${imei}\n`;
+        if (desc) {
+          block += `<b>Mô tả:</b> ${this.escapeTelegramHtml(desc)}\n`;
+        }
+        block += `<b>Giá:</b> ${d.Price}k\n`;
+        return block;
       }),
     );
 
-    return blocks.join('\n');
+    return blocks.join('\n\n');
   }
 
   private async fetchCustomerInfo(
@@ -291,8 +294,11 @@ export class KiotVietService {
       ),
     );
 
+    const contactNumber = customer.data.contactNumber ? `+${customer.data.contactNumber}` : '';
+    const address = customer.data.address ? customer.data.address : '';
+
     /// 3lines: name, contactNumber, address
-    return customer.data.name + '\n' + customer.data.contactNumber + '\n' + customer.data.address;
+    return customer.data.name + '\n' + contactNumber + '\n' + address;
   }
 
   private async buildCustomerSectionHtml(invoice: KiotVietWebhookInvoiceDataDto): Promise<string> {
@@ -364,6 +370,7 @@ export class KiotVietService {
 
       return parts.join('\n');
     }
+    return '';
   }
 
   /**
@@ -382,25 +389,24 @@ export class KiotVietService {
     const customer = await this.buildCustomerSectionHtml(invoice);
 
     const header =
-      `<b>Ngày bán:</b> ${this.escapeTelegramHtml(saleDate)} · <b>NV:</b> ${staff}`;
+      `<b>NGÀY BÁN HÀNG:</b> ${this.escapeTelegramHtml(saleDate)}\n` +
+      `<b>NHÂN VIÊN BÁN HÀNG:</b> ${staff}`;
 
-    const productSection = products.trim()
-      ? `<b>Sản phẩm</b>\n${products}`
-      : `<b>Sản phẩm</b>\n—`;
+    const productSection = products.trim() ? products : '—';
 
     const sections: string[] = [header, productSection];
 
     const warrantyText = String(warrantyBlock ?? '').trim();
     if (warrantyText) {
-      sections.push(`<b>BH / PK</b>\n${warrantyText}`);
+      sections.push(`<b>BẢO HÀNH / PHỤ KIỆN:</b>\n${warrantyText}`);
     }
 
     const customerSection = customer.trim()
-      ? `<b>Khách</b>\n${this.escapeTelegramHtml(customer)}`
-      : `<b>Khách</b>\n—`;
+      ? `<b>KHÁCH HÀNG:</b>\n${this.escapeTelegramHtml(customer)}`
+      : `<b>KHÁCH HÀNG:</b>\n—`;
     sections.push(customerSection);
 
-    sections.push(`<b>Ghi chú:</b> ${invoiceNote}`);
+    sections.push(`<b>GHI CHÚ:</b> ${invoiceNote}`);
 
     return sections.join('\n\n');
   }
