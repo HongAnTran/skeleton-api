@@ -381,15 +381,28 @@ export class KiotVietService {
       : '—';
     const customer = await this.buildCustomerSectionHtml(invoice);
 
-    return (
-      `${this.escapeTelegramHtml(saleDate)} - ${staff} bán` + '\n' +
+    const header =
+      `<b>Ngày bán:</b> ${this.escapeTelegramHtml(saleDate)} · <b>NV:</b> ${staff}`;
 
-      `\n${products}\n` +
-      `\n${warrantyBlock}\n\n` +
-      `${customer}\n\n` +
-      ` ${invoiceNote}\n
-      `
-    );
+    const productSection = products.trim()
+      ? `<b>Sản phẩm</b>\n${products}`
+      : `<b>Sản phẩm</b>\n—`;
+
+    const sections: string[] = [header, productSection];
+
+    const warrantyText = String(warrantyBlock ?? '').trim();
+    if (warrantyText) {
+      sections.push(`<b>BH / PK</b>\n${warrantyText}`);
+    }
+
+    const customerSection = customer.trim()
+      ? `<b>Khách</b>\n${this.escapeTelegramHtml(customer)}`
+      : `<b>Khách</b>\n—`;
+    sections.push(customerSection);
+
+    sections.push(`<b>Ghi chú:</b> ${invoiceNote}`);
+
+    return sections.join('\n\n');
   }
 
   private async sendTelegramMessage(
