@@ -352,7 +352,7 @@ export class KiotVietService {
           const sub = price * qty;
           const money =
             sub > 0 ? ` — ${sub.toLocaleString('vi-VN')}k` : '';
-          parts.push(`+ ${name} ${money}`);
+          parts.push(`${name} ${money}`);
         }
       }
 
@@ -385,8 +385,8 @@ export class KiotVietService {
       `${this.escapeTelegramHtml(saleDate)} - ${staff} bán` + '\n' +
 
       `\n${products}\n` +
-      `\n${warrantyBlock}\n` +
-      `${customer}\n` +
+      `\n${warrantyBlock}\n\n` +
+      `${customer}\n\n` +
       ` ${invoiceNote}\n
       `
     );
