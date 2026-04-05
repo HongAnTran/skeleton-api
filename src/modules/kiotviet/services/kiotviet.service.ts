@@ -339,7 +339,7 @@ export class KiotVietService {
         const price = d.Price ?? 0;
         const sub = price * qty;
         const money =
-          sub > 0 ? ` — ${sub.toLocaleString('vi-VN')} đ` : '';
+          sub > 0 ? ` — ${sub.toLocaleString('vi-VN')}k` : '';
         parts.push(`${name} ${money}`);
       }
 
@@ -351,7 +351,7 @@ export class KiotVietService {
           const price = d.Price ?? 0;
           const sub = price * qty;
           const money =
-            sub > 0 ? ` — ${sub.toLocaleString('vi-VN')} đ` : '';
+            sub > 0 ? ` — ${sub.toLocaleString('vi-VN')}k` : '';
           parts.push(`+ ${name} ${money}`);
         }
       }
@@ -384,10 +384,10 @@ export class KiotVietService {
     return (
       `${this.escapeTelegramHtml(saleDate)} - ${staff} bán` + '\n' +
 
-      `\n${products}\n\n` +
-      `\n${warrantyBlock}\n\n` +
-      `${customer}\n\n` +
-      ` ${invoiceNote}\n\n
+      `\n${products}\n` +
+      `\n${warrantyBlock}\n` +
+      `${customer}\n` +
+      ` ${invoiceNote}\n
       `
     );
   }
