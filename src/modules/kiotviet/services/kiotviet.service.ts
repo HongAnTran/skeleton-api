@@ -157,7 +157,7 @@ export class KiotVietService {
           const html =
             invoice.Status === 2
               ? this.buildCancelledInvoiceTelegramHtml(invoice)
-              : this.buildSaleNotificationTelegramHtml(invoice);
+              : await this.buildSaleNotificationTelegramHtml(invoice);
           await this.sendTelegramMessage(token.trim(), chatId.trim(), html);
         }
       }
@@ -214,51 +214,90 @@ export class KiotVietService {
     });
   }
 
-  private buildProductSectionHtml(invoice: KiotVietWebhookInvoiceDataDto): string {
+
+  /**
+   * GET /products/{id} hoặc /products/code/{code} — hiển thị mô tả hàng hóa thay cho Note dòng HĐ.
+   */
+  private async fetchProductDescriptionForLine(
+    detail: KiotVietWebhookInvoiceDetailDto,
+  ): Promise<string> {
+
+
+    if (!this.retailer || !this.clientId || !this.clientSecret) {
+      return '';
+    }
+
+    const product = await firstValueFrom(
+      this.httpService.get<{ description: string }>(
+        `${this.baseUrl}/products/${detail.ProductId}`,
+        {
+          headers: {
+            Retailer: this.retailer,
+            Authorization: `Bearer ${await this.getAccessToken()}`,
+          }
+        },
+      ),
+    );
+
+    return product.data.description;
+  }
+
+  private async buildProductSectionHtml(
+    invoice: KiotVietWebhookInvoiceDataDto,
+  ): Promise<string> {
     const allLines = invoice.InvoiceDetails ?? [];
     if (allLines.length === 0) return '+ <i>Không có dòng sản phẩm</i>';
 
     const lines = this.filterMainProductLines(allLines);
     if (lines.length === 0) {
-      return '+ <i>Không có dòng sản phẩm chính — toàn bộ là bảo hành/phụ kiện hoặc chưa có mã IMEI trên mã SP.</i>';
+      return '';
     }
 
-    return lines
-      .map((d, i) => {
+    const blocks = await Promise.all(
+      lines.map(async (d) => {
         const name = this.escapeTelegramHtml(d.ProductName || '—');
         const imei = this.escapeTelegramHtml(this.lineImeiOrSerial(d));
-        const note = d.Note?.trim()
-          ? this.escapeTelegramHtml(d.Note.trim())
-          : '—';
-        const qty = d.Quantity ?? 0;
+        const descriptionLine = await this.fetchProductDescriptionForLine(d);
         return (
-          `<b>+ ${i + 1}. ${name}</b>\n` +
-          `+ Số lượng: ${qty}\n` +
-          `+ Số IMEI / serial: ${imei}\n` +
-          `+ Tình trạng / ghi chú dòng: ${note}\n`
+          `<b>${name}</b>\n` +
+          `${descriptionLine}\n` +
+          `${imei}\n`
         );
-      })
-      .join('\n');
+      }),
+    );
+
+    return blocks.join('\n');
   }
 
-  private buildCustomerSectionHtml(invoice: KiotVietWebhookInvoiceDataDto): string {
-    const parts: string[] = [];
-    parts.push(`+ Tên: ${this.escapeTelegramHtml(invoice.CustomerName || '—')}`);
-    parts.push(`+ Mã KH: ${this.escapeTelegramHtml(invoice.CustomerCode || '—')}`);
-    const del = invoice.InvoiceDelivery;
-    if (del?.ContactNumber?.trim()) {
-      parts.push(`+ SĐT (giao hàng): ${this.escapeTelegramHtml(del.ContactNumber.trim())}`);
+  private async fetchCustomerInfo(
+    customerId: number,
+  ): Promise<string> {
+
+
+    if (!this.retailer || !this.clientId || !this.clientSecret) {
+      return '';
     }
-    if (del?.Receiver?.trim()) {
-      parts.push(`+ Người nhận: ${this.escapeTelegramHtml(del.Receiver.trim())}`);
-    }
-    if (del?.Address?.trim()) {
-      parts.push(`+ Địa chỉ: ${this.escapeTelegramHtml(del.Address.trim())}`);
-    }
-    parts.push(`+ Mã HĐ: ${this.escapeTelegramHtml(invoice.Code || '—')}`);
-    parts.push(`+ Trạng thái đơn: ${this.escapeTelegramHtml(invoice.StatusValue || '—')}`);
-    parts.push(`+ Chi nhánh: ${this.escapeTelegramHtml(invoice.BranchName || '—')}`);
-    return parts.join('\n');
+
+    const customer = await firstValueFrom(
+      this.httpService.get<{ name: string, contactNumber: string, email: string, address: string }>(
+        `${this.baseUrl}/customers/${customerId}`,
+        {
+          headers: {
+            Retailer: this.retailer,
+            Authorization: `Bearer ${await this.getAccessToken()}`,
+          }
+        },
+      ),
+    );
+
+    /// 3lines: name, contactNumber, address
+    return customer.data.name + '\n' + customer.data.contactNumber + '\n' + customer.data.address;
+  }
+
+  private async buildCustomerSectionHtml(invoice: KiotVietWebhookInvoiceDataDto): Promise<string> {
+
+    const customer = await this.fetchCustomerInfo(invoice.CustomerId);
+    return customer
   }
 
   /** Hóa đơn đã hủy: chỉ báo mã HĐ + nhân viên. */
@@ -359,25 +398,26 @@ export class KiotVietService {
   /**
    * Nội dung HTML (parse_mode HTML) tương ứng mẫu tin nhắn bán hàng.
    */
-  private buildSaleNotificationTelegramHtml(
+  private async buildSaleNotificationTelegramHtml(
     invoice: KiotVietWebhookInvoiceDataDto,
-  ): string {
+  ): Promise<string> {
     const saleDate = this.formatSaleDateVi(invoice.PurchaseDate);
     const staff = this.escapeTelegramHtml(invoice.SoldByName || '—');
-    const products = this.buildProductSectionHtml(invoice);
+    const products = await this.buildProductSectionHtml(invoice);
     const warrantyBlock = this.buildWarrantyAndAccessorySectionHtml(invoice);
     const invoiceNote = invoice.Description?.trim()
       ? this.escapeTelegramHtml(invoice.Description.trim())
       : '—';
-    const customer = this.buildCustomerSectionHtml(invoice);
+    const customer = await this.buildCustomerSectionHtml(invoice);
 
     return (
-      `<b>NGÀY BÁN HÀNG:</b> ${this.escapeTelegramHtml(saleDate)}\n\n` +
-      `<b>NHÂN VIÊN BÁN HÀNG:</b> ${staff}\n\n` +
-      `<b>THÔNG TIN SẢN PHẨM:</b>\n${products}\n\n` +
-      `<b>THÔNG TIN VỀ GÓI BẢO HÀNH VÀ PHỤ KIỆN:</b>\n${warrantyBlock}\n\n` +
-      `<b>GHI CHÚ TỪ HOÁ ĐƠN:</b>\n${invoiceNote}\n\n` +
-      `<b>THÔNG TIN KHÁCH HÀNG TỪ ĐƠN HÀNG:</b>\n${customer}`
+      `${this.escapeTelegramHtml(saleDate)} - ${staff} bán` + '\n' +
+
+      `\n${products}\n\n` +
+      `\n${warrantyBlock}\n\n` +
+      `${customer}\n\n` +
+      ` ${invoiceNote}\n\n
+      `
     );
   }
 
