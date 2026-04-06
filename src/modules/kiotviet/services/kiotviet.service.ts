@@ -151,6 +151,7 @@ export class KiotVietService {
     try {
       const token = this.configService.get<string>('TELEGRAM_BOT_TOKEN');
       const chatId = this.configService.get<string>('TELEGRAM_GROUP_CHAT_ID');
+      const chatId2 = this.configService.get<string>('TELEGRAM_GROUP_CHAT_ID_2');
       if (!token?.trim() || !chatId?.trim()) {
         this.logger.warn(
           'Chưa cấu hình TELEGRAM_BOT_TOKEN hoặc TELEGRAM_GROUP_CHAT_ID — bỏ qua gửi Telegram',
@@ -182,7 +183,7 @@ export class KiotVietService {
             invoice.Status === 2
               ? this.buildCancelledInvoiceTelegramHtml(invoice)
               : await this.buildSaleNotificationTelegramHtml(invoice);
-          await this.sendTelegramMessage(token.trim(), chatId.trim(), html);
+          await this.sendTelegramMessage(token.trim(), chatId.trim(), html, chatId2.trim());
         }
       }
     } catch (error) {
@@ -572,11 +573,16 @@ export class KiotVietService {
     botToken: string,
     chatId: string,
     text: string,
+    chatId2: string,
   ): Promise<void> {
 
     try {
       const bot = this.getTelegraf(botToken);
       await bot.telegram.sendMessage(chatId, text, {
+        parse_mode: 'HTML',
+        link_preview_options: { is_disabled: true },
+      });
+      await bot.telegram.sendMessage(chatId2, text, {
         parse_mode: 'HTML',
         link_preview_options: { is_disabled: true },
       });

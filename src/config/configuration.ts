@@ -42,6 +42,7 @@ export default () => ({
   telegram: {
     botToken: process.env.TELEGRAM_BOT_TOKEN,
     groupChatId: process.env.TELEGRAM_GROUP_CHAT_ID,
+    groupChatId2: process.env.TELEGRAM_GROUP_CHAT_ID_2,
   },
   dahahi: {
     baseUrl: process.env.DAHAHI_BASE_URL,
