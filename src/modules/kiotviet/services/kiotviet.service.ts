@@ -382,7 +382,7 @@ export class KiotVietService {
         if (brand.trim()) {
           block += `<b>Thương hiệu:</b> ${this.escapeTelegramHtml(brand.trim())},${categoryName.trim()}\n`;
         }
-        block += `<b>Giá:</b> ${d.Price}k\n`;
+        block += `<b>Giá:</b> ${d.Price - d.Discount}k\n`;
         return block;
       }),
     );
