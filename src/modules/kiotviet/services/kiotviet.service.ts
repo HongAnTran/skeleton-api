@@ -178,6 +178,23 @@ export class KiotVietService {
     return text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   }
 
+  /** Rich text KiotViet (thường bọc &lt;p&gt;…&lt;/p&gt;) — bỏ thẻ, giữ nội dung đọc được trên Telegram. */
+  private stripHtmlToPlainText(html: string): string {
+    if (!html) return '';
+    return html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/p>/gi, '\n')
+      .replace(/<p[^>]*>/gi, '')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/gi, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/\n{3,}/g, '\n\n')
+      .trim();
+  }
+
   /** dd/mm/yyyy theo Asia/Ho_Chi_Minh */
   private formatSaleDateVi(isoDate: string | undefined): string {
     const d = isoDate ? new Date(isoDate) : new Date();
@@ -258,7 +275,7 @@ export class KiotVietService {
         const name = this.escapeTelegramHtml(d.ProductName || '—');
         const imei = this.escapeTelegramHtml(this.lineImeiOrSerial(d));
         const descriptionLine = await this.fetchProductDescriptionForLine(d);
-        const desc = descriptionLine?.trim();
+        const desc = this.stripHtmlToPlainText(descriptionLine ?? '').trim();
         let block =
           `<b>Tên Sản Phẩm:</b> ${name}\n` +
           `<b>Số IMEI:</b> ${imei}\n`;
@@ -384,7 +401,9 @@ export class KiotVietService {
     const products = await this.buildProductSectionHtml(invoice);
     const warrantyBlock = this.buildWarrantyAndAccessorySectionHtml(invoice);
     const invoiceNote = invoice.Description?.trim()
-      ? this.escapeTelegramHtml(invoice.Description.trim())
+      ? this.escapeTelegramHtml(
+          this.stripHtmlToPlainText(invoice.Description.trim()),
+        )
       : '—';
     const customer = await this.buildCustomerSectionHtml(invoice);
 
