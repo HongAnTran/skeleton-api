@@ -384,7 +384,7 @@ export class KiotVietService {
           `<b>Tên Sản Phẩm:</b> ${name}\n` +
           `<b>Số IMEI:</b> ${imei}\n`;
         if (brand.trim()) {
-          block += `<b>Thương hiệu:</b> ${this.escapeTelegramHtml(brand.trim())},${categoryName.trim()}\n`;
+          block += `<b>Mô Tả:</b> ${this.escapeTelegramHtml(brand.trim())}, ${categoryName.trim()}\n`;
         }
         block += `<b>Giá:</b> ${priceStr}\n`;
         return block;
