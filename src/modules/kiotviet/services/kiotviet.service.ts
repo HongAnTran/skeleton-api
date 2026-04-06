@@ -374,6 +374,9 @@ export class KiotVietService {
       lines.map(async (d) => {
         const name = this.escapeTelegramHtml(d.ProductName || '—');
         const imei = this.escapeTelegramHtml(this.lineImeiOrSerial(d));
+
+        const price = d.Price - d.Discount;
+        const priceStr = price > 0 ? `${price.toLocaleString('vi-VN')}k` : '—';
         const { brand, categoryName } =
           await this.fetchProductDescriptionForLine(d);
         let block =
@@ -382,7 +385,7 @@ export class KiotVietService {
         if (brand.trim()) {
           block += `<b>Thương hiệu:</b> ${this.escapeTelegramHtml(brand.trim())},${categoryName.trim()}\n`;
         }
-        block += `<b>Giá:</b> ${d.Price - d.Discount}k\n`;
+        block += `<b>Giá:</b> ${priceStr}\n`;
         return block;
       }),
     );
