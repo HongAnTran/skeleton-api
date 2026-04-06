@@ -158,7 +158,7 @@ export class KiotVietService {
         return;
       }
 
-      this.logger.log('handleWebhookPayload', body);
+      this.logger.log('handleWebhookPayload', body.Notifications[0].Data[0].InvoiceDetails);
 
       // check xem PurchaseDate phải là thuộc ngày hôm nay thì mới xử lí
 
