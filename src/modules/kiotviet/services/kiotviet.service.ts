@@ -578,14 +578,17 @@ export class KiotVietService {
 
     try {
       const bot = this.getTelegraf(botToken);
-      await bot.telegram.sendMessage(chatId, text, {
-        parse_mode: 'HTML',
-        link_preview_options: { is_disabled: true },
-      });
-      await bot.telegram.sendMessage(chatId2, text, {
-        parse_mode: 'HTML',
-        link_preview_options: { is_disabled: true },
-      });
+      // vieets promise all cái nào lỗi thì bỏ qua
+      await Promise.all([
+        bot.telegram.sendMessage(chatId, text, {
+          parse_mode: 'HTML',
+          link_preview_options: { is_disabled: true },
+        }),
+        bot.telegram.sendMessage(chatId2, text, {
+          parse_mode: 'HTML',
+          link_preview_options: { is_disabled: true },
+        }),
+      ]);
     } catch (error) {
       this.logger.error('Gửi Telegram thất bại', error);
     }
