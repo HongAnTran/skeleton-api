@@ -158,12 +158,24 @@ export class KiotVietService {
         return;
       }
 
+      this.logger.log('handleWebhookPayload', body);
+
+      // check xem PurchaseDate phải là thuộc ngày hôm nay thì mới xử lí
+
+
       /** 1: hoàn thành, 2: đã hủy (KiotVietWebhookInvoiceDataDto). */
       const NOTIFY_STATUSES = new Set([1, 2]);
 
       for (const notification of body.Notifications ?? []) {
         for (const invoice of notification.Data ?? []) {
           if (!NOTIFY_STATUSES.has(invoice.Status)) {
+            continue;
+          }
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const purchaseDate = new Date(invoice.PurchaseDate);
+          purchaseDate.setHours(0, 0, 0, 0);
+          if (purchaseDate.getTime() !== today.getTime()) {
             continue;
           }
           const html =
@@ -316,13 +328,13 @@ export class KiotVietService {
    */
   private async fetchProductDescriptionForLine(
     detail: KiotVietWebhookInvoiceDetailDto,
-  ): Promise<{ brand: string }> {
+  ): Promise<{ brand: string, categoryName: string }> {
     if (!this.retailer || !this.clientId || !this.clientSecret) {
-      return { brand: '' };
+      return { brand: '', categoryName: '' };
     }
 
     const product = await firstValueFrom(
-      this.httpService.get<{ tradeMarkId: number }>(
+      this.httpService.get<{ tradeMarkId: number, categoryName: string }>(
         `${this.baseUrl}/products/${detail.ProductId}`,
         {
           headers: {
@@ -335,6 +347,7 @@ export class KiotVietService {
 
     const tradeMarkId = product.data?.tradeMarkId || 0
 
+    let categoryName = product.data?.categoryName || '';
 
 
     let brand = '';
@@ -343,7 +356,7 @@ export class KiotVietService {
         (await this.fetchTrademarkNameById(tradeMarkId));
     }
 
-    return { brand };
+    return { brand, categoryName };
   }
 
   private async buildProductSectionHtml(
@@ -361,13 +374,13 @@ export class KiotVietService {
       lines.map(async (d) => {
         const name = this.escapeTelegramHtml(d.ProductName || '—');
         const imei = this.escapeTelegramHtml(this.lineImeiOrSerial(d));
-        const { brand } =
+        const { brand, categoryName } =
           await this.fetchProductDescriptionForLine(d);
         let block =
           `<b>Tên Sản Phẩm:</b> ${name}\n` +
           `<b>Số IMEI:</b> ${imei}\n`;
         if (brand.trim()) {
-          block += `<b>Thương hiệu:</b> ${this.escapeTelegramHtml(brand.trim())}\n`;
+          block += `<b>Thương hiệu:</b> ${this.escapeTelegramHtml(brand.trim())},${categoryName.trim()}\n`;
         }
         block += `<b>Giá:</b> ${d.Price}k\n`;
         return block;
@@ -403,8 +416,8 @@ export class KiotVietService {
 
 
 
-    const customerCode = `Mã KH: ${customer.data.code}`;
-    return customerCode + '\n' + customer.data.name + '\n' + contactNumber + '\n' + address;
+
+    return customer.data.name + '\n' + contactNumber + '\n' + address;
   }
 
   private async buildCustomerSectionHtml(invoice: KiotVietWebhookInvoiceDataDto): Promise<string> {
