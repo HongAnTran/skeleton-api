@@ -404,7 +404,7 @@ export class KiotVietService {
     }
 
     const customer = await firstValueFrom(
-      this.httpService.get<{ name: string, contactNumber: string, email: string, address: string, code: string }>(
+      this.httpService.get<{ name: string, contactNumber: string, email: string, address: string, code: string, birthDate: string }>(
         `${this.baseUrl}/customers/${customerId}`,
         {
           headers: {
@@ -417,11 +417,14 @@ export class KiotVietService {
 
     const contactNumber = customer.data.contactNumber ? `${customer.data.contactNumber}` : '';
     const address = customer.data.address ? customer.data.address : '';
+    const birthDate = customer.data.birthDate ? customer.data.birthDate : '';
+
+    const birthDateStr = birthDate ? new Date(birthDate).toLocaleDateString('vi-VN') : '';
 
 
 
 
-    return customer.data.name + '\n' + contactNumber + '\n' + address;
+    return customer.data.name + '\n' + contactNumber + '\n' + address + '\n' + birthDateStr;
   }
 
   private async buildCustomerSectionHtml(invoice: KiotVietWebhookInvoiceDataDto): Promise<string> {
