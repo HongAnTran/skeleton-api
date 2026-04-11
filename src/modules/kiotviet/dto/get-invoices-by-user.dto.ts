@@ -37,13 +37,7 @@ export class GetInvoicesByUserQueryDto {
   @IsDateString()
   toPurchaseDate?: string;
 
-  @ApiPropertyOptional({
-    description:
-      'Chỉ tính vào báo cáo iPhone các dòng có productName chứa chuỗi này (không phân biệt hoa thường), ví dụ "16 Pro Max"',
-  })
-  @IsOptional()
-  @IsString()
-  productNameContains?: string;
+
 }
 
 export class IphoneMarketTotalsDto {

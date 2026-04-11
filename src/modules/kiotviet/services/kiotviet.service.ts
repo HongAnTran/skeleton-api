@@ -832,7 +832,7 @@ export class KiotVietService {
         }, 0);
 
         for (const d of nonWarrantyLines) {
-          this.accumulateIphoneReportLine(d, query, iphoneAgg);
+          this.accumulateIphoneReportLine(d, iphoneAgg);
         }
 
         warrantyRevenue += warrantyLines.reduce(
@@ -960,6 +960,7 @@ export class KiotVietService {
   /**
    * Parse productName dạng "iPhone 16 Pro Max 256GB Desert Titanium"
    * → model, dung lượng, màu (phần sau dung lượng).
+   * Chấp nhận cả "Phone …" (nhập thiếu chữ "i") và chuẩn hoá modelName thành "iPhone …".
    */
   private parseIphoneProductName(productName: string): {
     modelName: string;
@@ -967,14 +968,16 @@ export class KiotVietService {
     color: string;
   } | null {
     const raw = (productName || '').trim();
-    if (!/^iphone\s/i.test(raw)) return null;
-    const storageMatch = raw.match(/(\d+(?:\.\d+)?)(GB|TB)/i);
+    if (!/^i?phone\s/i.test(raw)) return null;
+    // Chuẩn hoá: đảm bảo bắt đầu bằng "iPhone" (thêm "i" nếu thiếu)
+    const normalised = /^phone\s/i.test(raw) ? `iPhone ${raw.slice(6)}` : raw;
+    const storageMatch = normalised.match(/(\d+(?:\.\d+)?)(GB|TB)/i);
     if (!storageMatch) return null;
     const storageToken = `${storageMatch[1]}${storageMatch[2].toUpperCase()}`;
-    const idx = raw.indexOf(storageMatch[0]);
+    const idx = normalised.indexOf(storageMatch[0]);
     if (idx <= 0) return null;
-    const modelName = raw.slice(0, idx).trim();
-    const color = raw.slice(idx + storageMatch[0].length).trim();
+    const modelName = normalised.slice(0, idx).trim();
+    const color = normalised.slice(idx + storageMatch[0].length).trim();
     if (!modelName || !color) return null;
     return { modelName, storage: storageToken, color };
   }
@@ -1000,17 +1003,12 @@ export class KiotVietService {
 
   private accumulateIphoneReportLine(
     d: any,
-    query: GetInvoicesByUserQueryDto,
     agg: IphoneReportAgg,
   ): void {
     const code = String(d?.productCode ?? '').trim();
     if (!this.isImeiLike(code)) return;
 
     const productName = String(d?.productName ?? '');
-    const filter = query.productNameContains?.trim();
-    if (filter && !productName.toLowerCase().includes(filter.toLowerCase())) {
-      return;
-    }
 
     const parsed = this.parseIphoneProductName(productName);
     if (!parsed) return;
@@ -1019,7 +1017,7 @@ export class KiotVietService {
     if (!Number.isFinite(qty) || qty <= 0) return;
 
     const productGroup = String(
-      d?.productGroup ?? d?.categoryName ?? '',
+      d?.categoryName ?? '',
     ).trim();
     const market = this.classifyIphoneMarketFromGroup(productGroup);
 
