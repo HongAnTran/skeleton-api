@@ -471,8 +471,10 @@ export class KiotVietService {
         const qty = d.Quantity ?? 0;
         const price = d.Price ?? 0;
         const sub = price * qty;
+        const discount = d.Discount ?? 0;
+        const subAfterDiscount = sub - discount;
         const money =
-          sub > 0 ? ` — ${sub.toLocaleString('vi-VN')}k` : '';
+          subAfterDiscount > 0 ? ` — ${subAfterDiscount.toLocaleString('vi-VN')}k` : '';
         parts.push(`${name} ${money}`);
       }
 
@@ -483,8 +485,10 @@ export class KiotVietService {
           const qty = d.Quantity ?? 0;
           const price = d.Price ?? 0;
           const sub = price * qty;
+          const discount = d.Discount ?? 0;
+          const subAfterDiscount = sub - discount;
           const money =
-            sub > 0 ? ` — ${sub.toLocaleString('vi-VN')}k` : '';
+            subAfterDiscount > 0 ? ` — ${subAfterDiscount.toLocaleString('vi-VN')}k` : '';
           parts.push(`${name} ${money}`);
         }
       }
