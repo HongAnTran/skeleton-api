@@ -47,15 +47,6 @@ interface KiotVietUsersApiResponse {
   removeIds?: number[];
 }
 
-/** GET /suppliers — 2.26.1 */
-interface KiotVietSuppliersApiResponse {
-  total: number;
-  pageSize: number;
-  data: KiotVietSupplierDto[];
-  /** Tài liệu KiotViet có thể là removedId hoặc removeIds */
-  removedId?: number[];
-  removeIds?: number[];
-}
 
 /** GET /trademark — danh mục thương hiệu (tài liệu 2.25). */
 interface KiotVietTrademarkListResponse {
