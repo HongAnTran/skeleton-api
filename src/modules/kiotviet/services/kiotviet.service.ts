@@ -1,6 +1,5 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { createHmac } from 'crypto';
 import { HttpService } from '@nestjs/axios';
 import { Telegraf } from 'telegraf';
 import { firstValueFrom } from 'rxjs';
@@ -9,11 +8,6 @@ import { InvoiceResponseDto } from '../dto/invoice-response.dto';
 import { WarrantyInfoDto } from '../dto/warranty.dto';
 import { GetUsersQueryDto } from '../dto/get-users-query.dto';
 import { GetUsersResponseDto, KiotVietUserDto } from '../dto/user-response.dto';
-import { GetSuppliersQueryDto } from '../dto/get-suppliers-query.dto';
-import {
-  GetSuppliersResponseDto,
-  KiotVietSupplierDto,
-} from '../dto/supplier-response.dto';
 import { GetInvoicesByUserQueryDto } from '../dto/get-invoices-by-user.dto';
 import {
   GetInvoicesByUserResponseDto,
@@ -731,74 +725,6 @@ export class KiotVietService {
       this.logger.error('Failed to get users', error);
       throw new HttpException(
         'Không thể lấy danh sách người dùng từ KiotViet',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-  }
-
-  /**
-   * Lấy danh sách nhà cung cấp (GET /suppliers — tài liệu 2.26.1).
-   */
-  async getSuppliers(
-    query: GetSuppliersQueryDto,
-  ): Promise<GetSuppliersResponseDto> {
-    if (!this.retailer || !this.clientId || !this.clientSecret) {
-      throw new HttpException(
-        'KiotViet chưa được cấu hình đầy đủ',
-        HttpStatus.INTERNAL_SERVER_ERROR,
-      );
-    }
-
-    try {
-      const token = await this.getAccessToken();
-      const headers = {
-        Retailer: this.retailer,
-        Authorization: `Bearer ${token}`,
-      };
-
-      const params: Record<string, string | number | boolean | undefined> = {};
-      if (query.pageSize != null) params.pageSize = query.pageSize;
-      if (query.currentItem != null) params.currentItem = query.currentItem;
-      if (query.orderDirection != null)
-        params.orderDirection = query.orderDirection;
-      if (query.code != null) params.code = query.code;
-      if (query.name != null) params.name = query.name;
-      if (query.contactNumber != null)
-        params.contactNumber = query.contactNumber;
-      if (query.lastModifiedFrom != null)
-        params.lastModifiedFrom = query.lastModifiedFrom;
-      if (query.StartDate != null) params.StartDate = query.StartDate;
-      if (query.EndDate != null) params.EndDate = query.EndDate;
-      if (query.includeRemoveIds != null)
-        params.includeRemoveIds = query.includeRemoveIds;
-      if (query.includeTotal != null) params.includeTotal = query.includeTotal;
-      if (query.includeSupplierGroup != null)
-        params.includeSupplierGroup = query.includeSupplierGroup;
-
-      const response = await firstValueFrom(
-        this.httpService.get<KiotVietSuppliersApiResponse>(
-          `${this.baseUrl}/suppliers`,
-          { headers, params },
-        ),
-      );
-
-      const payload = response.data;
-      const removed = payload?.removedId ?? payload?.removeIds;
-
-      const result: GetSuppliersResponseDto = {
-        total: payload?.total ?? 0,
-        pageSize: payload?.pageSize ?? query.pageSize ?? 20,
-        data: payload?.data ?? [],
-      };
-      if (removed != null) {
-        result.removedId = removed;
-      }
-      return result;
-    } catch (error) {
-      if (error instanceof HttpException) throw error;
-      this.logger.error('Failed to get suppliers', error);
-      throw new HttpException(
-        'Không thể lấy danh sách nhà cung cấp từ KiotViet',
         HttpStatus.INTERNAL_SERVER_ERROR,
       );
     }
