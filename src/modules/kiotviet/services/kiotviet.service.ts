@@ -9,6 +9,11 @@ import { InvoiceResponseDto } from '../dto/invoice-response.dto';
 import { WarrantyInfoDto } from '../dto/warranty.dto';
 import { GetUsersQueryDto } from '../dto/get-users-query.dto';
 import { GetUsersResponseDto, KiotVietUserDto } from '../dto/user-response.dto';
+import { GetSuppliersQueryDto } from '../dto/get-suppliers-query.dto';
+import {
+  GetSuppliersResponseDto,
+  KiotVietSupplierDto,
+} from '../dto/supplier-response.dto';
 import { GetInvoicesByUserQueryDto } from '../dto/get-invoices-by-user.dto';
 import {
   GetInvoicesByUserResponseDto,
@@ -45,6 +50,16 @@ interface KiotVietUsersApiResponse {
       isAdmin?: boolean;
     }
   >;
+  removeIds?: number[];
+}
+
+/** GET /suppliers — 2.26.1 */
+interface KiotVietSuppliersApiResponse {
+  total: number;
+  pageSize: number;
+  data: KiotVietSupplierDto[];
+  /** Tài liệu KiotViet có thể là removedId hoặc removeIds */
+  removedId?: number[];
   removeIds?: number[];
 }
 
@@ -722,6 +737,74 @@ export class KiotVietService {
   }
 
   /**
+   * Lấy danh sách nhà cung cấp (GET /suppliers — tài liệu 2.26.1).
+   */
+  async getSuppliers(
+    query: GetSuppliersQueryDto,
+  ): Promise<GetSuppliersResponseDto> {
+    if (!this.retailer || !this.clientId || !this.clientSecret) {
+      throw new HttpException(
+        'KiotViet chưa được cấu hình đầy đủ',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    try {
+      const token = await this.getAccessToken();
+      const headers = {
+        Retailer: this.retailer,
+        Authorization: `Bearer ${token}`,
+      };
+
+      const params: Record<string, string | number | boolean | undefined> = {};
+      if (query.pageSize != null) params.pageSize = query.pageSize;
+      if (query.currentItem != null) params.currentItem = query.currentItem;
+      if (query.orderDirection != null)
+        params.orderDirection = query.orderDirection;
+      if (query.code != null) params.code = query.code;
+      if (query.name != null) params.name = query.name;
+      if (query.contactNumber != null)
+        params.contactNumber = query.contactNumber;
+      if (query.lastModifiedFrom != null)
+        params.lastModifiedFrom = query.lastModifiedFrom;
+      if (query.StartDate != null) params.StartDate = query.StartDate;
+      if (query.EndDate != null) params.EndDate = query.EndDate;
+      if (query.includeRemoveIds != null)
+        params.includeRemoveIds = query.includeRemoveIds;
+      if (query.includeTotal != null) params.includeTotal = query.includeTotal;
+      if (query.includeSupplierGroup != null)
+        params.includeSupplierGroup = query.includeSupplierGroup;
+
+      const response = await firstValueFrom(
+        this.httpService.get<KiotVietSuppliersApiResponse>(
+          `${this.baseUrl}/suppliers`,
+          { headers, params },
+        ),
+      );
+
+      const payload = response.data;
+      const removed = payload?.removedId ?? payload?.removeIds;
+
+      const result: GetSuppliersResponseDto = {
+        total: payload?.total ?? 0,
+        pageSize: payload?.pageSize ?? query.pageSize ?? 20,
+        data: payload?.data ?? [],
+      };
+      if (removed != null) {
+        result.removedId = removed;
+      }
+      return result;
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error('Failed to get suppliers', error);
+      throw new HttpException(
+        'Không thể lấy danh sách nhà cung cấp từ KiotViet',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+  }
+
+  /**
    * Lấy toàn bộ hóa đơn trong khoảng thời gian (phân trang 100/item).
    * Nếu có userId thì lọc theo soldById; không có thì giữ toàn bộ và tính báo cáo trên tập đó.
    */
@@ -971,13 +1054,17 @@ export class KiotVietService {
     if (!/^i?phone\s/i.test(raw)) return null;
     // Chuẩn hoá: đảm bảo bắt đầu bằng "iPhone" (thêm "i" nếu thiếu)
     const normalised = /^phone\s/i.test(raw) ? `iPhone ${raw.slice(6)}` : raw;
-    const storageMatch = normalised.match(/(\d+(?:\.\d+)?)(GB|TB)/i);
+    // Chuẩn hoá storage token: "1T GB" → "1TB", "256 GB" → "256GB", "1 TB" → "1TB"
+    const preprocessed = normalised
+      .replace(/(\d(?:\.\d+)?)\s*T\s+GB/gi, '$1TB')
+      .replace(/(\d(?:\.\d+)?)\s+(GB|TB)/gi, '$1$2');
+    const storageMatch = preprocessed.match(/(\d+(?:\.\d+)?)(GB|TB)/i);
     if (!storageMatch) return null;
     const storageToken = `${storageMatch[1]}${storageMatch[2].toUpperCase()}`;
-    const idx = normalised.indexOf(storageMatch[0]);
+    const idx = preprocessed.indexOf(storageMatch[0]);
     if (idx <= 0) return null;
-    const modelName = normalised.slice(0, idx).trim();
-    const color = normalised.slice(idx + storageMatch[0].length).trim();
+    const modelName = preprocessed.slice(0, idx).trim();
+    const color = preprocessed.slice(idx + storageMatch[0].length).trim();
     if (!modelName || !color) return null;
     return { modelName, storage: storageToken, color };
   }
