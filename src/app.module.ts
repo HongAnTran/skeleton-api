@@ -26,6 +26,7 @@ import { ReportsModule } from './modules/reports/reports.module';
 import { LeaveRequestsModule } from './modules/leave-requests/leave-requests.module';
 import { KiotVietModule } from './modules/kiotviet/kiotviet.module';
 import { DahahiModule } from './modules/dahahi/dahahi.module';
+import { VoucherRulesModule } from './modules/voucher-rules/voucher-rules.module';
 
 import configuration from './config/configuration';
 import appConfig from './config/app.config';
@@ -72,6 +73,7 @@ import { CronModule } from './common/cron/cron.module';
     LeaveRequestsModule,
     KiotVietModule,
     DahahiModule,
+    VoucherRulesModule,
     CronModule,
   ],
   controllers: [AppController],
