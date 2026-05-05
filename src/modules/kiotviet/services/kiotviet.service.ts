@@ -3,6 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { Telegraf } from 'telegraf';
 import { firstValueFrom } from 'rxjs';
+import * as fs from 'fs';
+import * as path from 'path';
 import { SearchInvoiceDto } from '../dto/search-invoice.dto';
 import { InvoiceResponseDto } from '../dto/invoice-response.dto';
 import { WarrantyInfoDto } from '../dto/warranty.dto';
@@ -19,6 +21,11 @@ import {
   KiotVietWebhookInvoiceDataDto,
   KiotVietWebhookInvoiceDetailDto,
 } from 'src/modules/kiotviet/dto/kiotviet-webhook.dto';
+import {
+  VoucherResponseDto,
+  VoucherCandidateDto,
+  VoucherDto,
+} from '../dto/voucher-response.dto';
 
 interface KiotVietTokenResponse {
   access_token: string;
@@ -117,6 +124,25 @@ interface GoogleScriptInvoiceResponse {
   };
 }
 
+interface VoucherInvoiceCountTier {
+  minInvoices: number;
+  discountVnd: number;
+  label: string;
+}
+
+interface VoucherWarrantyRule {
+  warrantyType: string;
+  discountVnd: number;
+  label: string;
+}
+
+interface VoucherRulesConfig {
+  version: number;
+  currency: string;
+  invoiceCountTiers: VoucherInvoiceCountTier[];
+  warrantyVouchers: VoucherWarrantyRule[];
+}
+
 @Injectable()
 export class KiotVietService {
   private readonly logger = new Logger(KiotVietService.name);
@@ -126,6 +152,7 @@ export class KiotVietService {
   /** Telegraf chỉ dùng `telegram.sendMessage` (không `launch`). */
   private telegramBot: Telegraf | null = null;
   private telegramBotToken: string | null = null;
+  private voucherRulesCache: VoucherRulesConfig | null = null;
 
   constructor(
     private readonly httpService: HttpService,
@@ -1522,6 +1549,202 @@ export class KiotVietService {
       ...invoice,
       invoiceDetails: filteredInvoiceDetails,
       warranty: warrantyInfo,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Voucher rules config
+  // ---------------------------------------------------------------------------
+
+  private loadVoucherRules(): VoucherRulesConfig {
+    if (this.voucherRulesCache) {
+      return this.voucherRulesCache;
+    }
+
+    const configPath = path.join(
+      __dirname,
+      '..',
+      'config',
+      'voucher-rules.json',
+    );
+    const raw = fs.readFileSync(configPath, 'utf-8');
+    const config: VoucherRulesConfig = JSON.parse(raw);
+
+    // Đảm bảo tier luôn sắp xếp giảm dần để lấy match đầu tiên >= threshold
+    config.invoiceCountTiers = [...config.invoiceCountTiers].sort(
+      (a, b) => b.minInvoices - a.minInvoices,
+    );
+
+    this.voucherRulesCache = config;
+    return config;
+  }
+
+  /** Xoá cache để lần đọc tiếp theo sẽ reload từ file (dùng cho API edit config sau này). */
+  reloadVoucherRules(): void {
+    this.voucherRulesCache = null;
+    this.logger.log('Voucher rules cache invalidated');
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lấy toàn bộ hóa đơn của khách theo SĐT (có phân trang)
+  // ---------------------------------------------------------------------------
+
+  private async fetchAllInvoicesByPhone(
+    phone: string,
+    headers: Record<string, string>,
+  ): Promise<{
+    customerId: number | null;
+    customerName: string | null;
+    invoices: InvoiceResponseDto[];
+  }> {
+    // Bước 1: tìm khách hàng theo SĐT
+    const customerResponse = await firstValueFrom(
+      this.httpService.get(`${this.baseUrl}/customers`, {
+        headers,
+        params: {
+          includeRemoveIds: false,
+          pageSize: 100,
+          currentItem: 0,
+          orderBy: 'CreatedDate',
+          orderDirection: 'Desc',
+          contactNumber: phone,
+        },
+      }),
+    );
+
+    const customers: Array<{ id: number; name: string; code: string }> =
+      customerResponse.data?.data || [];
+
+    if (customers.length === 0) {
+      return { customerId: null, customerName: null, invoices: [] };
+    }
+
+    const customerIds = customers.map((c) => c.id).join(',');
+    const primaryCustomer = customers[0];
+
+    // Bước 2: lấy toàn bộ hóa đơn với phân trang
+    const pageSize = 100;
+
+    const { data } = await firstValueFrom(
+      this.httpService.get<KiotVietInvoiceResponse>(
+        `${this.baseUrl}/invoices`,
+        {
+          headers,
+          params: {
+            format: 'json',
+            pageSize,
+            customerIds,
+            status: 1,
+          },
+        },
+      ),
+    );
+
+    return {
+      customerId: primaryCustomer.id,
+      customerName: primaryCustomer.name,
+      invoices: data?.data ?? [],
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Tính voucher theo SĐT (public entry point)
+  // ---------------------------------------------------------------------------
+
+  async calculateVoucherByPhone(phone: string): Promise<VoucherResponseDto> {
+    if (!this.retailer || !this.clientId || !this.clientSecret) {
+      throw new HttpException(
+        'KiotViet chưa được cấu hình đầy đủ',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    if (!phone?.trim()) {
+      throw new HttpException(
+        'Vui lòng cung cấp số điện thoại',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const rules = this.loadVoucherRules();
+
+    const token = await this.getAccessToken();
+    const headers = {
+      Retailer: this.retailer,
+      Authorization: `Bearer ${token}`,
+    };
+
+    const { customerId, customerName, invoices } =
+      await this.fetchAllInvoicesByPhone(phone.trim(), headers);
+
+    if (!customerId) {
+      return {
+        phone: phone.trim(),
+        customerId: undefined,
+        customerName: undefined,
+        totalInvoices: 0,
+        voucher: null,
+        candidates: [],
+      };
+    }
+
+    // Map qua calculateWarranty để có warranty.warrantyType + warranty.status
+    const enrichedInvoices = invoices.map((inv) =>
+      this.calculateWarranty(inv),
+    );
+
+    const candidates: VoucherCandidateDto[] = [];
+
+    // Candidate 1: tier theo số hóa đơn
+    const totalInvoices = enrichedInvoices.length;
+    const matchedTier = rules.invoiceCountTiers.find(
+      (tier) => totalInvoices >= tier.minInvoices,
+    );
+    if (matchedTier) {
+      candidates.push({
+        source: 'INVOICE_COUNT',
+        discountVnd: matchedTier.discountVnd,
+        label: matchedTier.label,
+      });
+    }
+
+    // Candidate 2: warranty còn hạn
+    for (const rule of rules.warrantyVouchers) {
+      const hasActive = enrichedInvoices.some(
+        (inv) =>
+          inv.warranty?.warrantyType === rule.warrantyType &&
+          inv.warranty?.status === 'Còn hiệu lực',
+      );
+
+      if (hasActive) {
+        candidates.push({
+          source: 'WARRANTY',
+          discountVnd: rule.discountVnd,
+          label: rule.label,
+        });
+      }
+    }
+
+    // Chọn voucher có discountVnd cao nhất; nếu hoà ưu tiên WARRANTY
+    let bestVoucher: VoucherDto | null = null;
+    for (const c of candidates) {
+      if (
+        !bestVoucher ||
+        c.discountVnd > bestVoucher.discountVnd ||
+        (c.discountVnd === bestVoucher.discountVnd &&
+          c.source === 'WARRANTY')
+      ) {
+        bestVoucher = { discountVnd: c.discountVnd, label: c.label, source: c.source };
+      }
+    }
+
+    return {
+      phone: phone.trim(),
+      customerId,
+      customerName: customerName ?? undefined,
+      totalInvoices,
+      voucher: bestVoucher,
+      candidates,
     };
   }
 }

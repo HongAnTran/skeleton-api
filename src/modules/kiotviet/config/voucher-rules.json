@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "currency": "VND",
+  "invoiceCountTiers": [
+    {
+      "minInvoices": 4,
+      "discountVnd": 300000,
+      "label": "Khách thân thiết - 4+ hóa đơn"
+    },
+    {
+      "minInvoices": 3,
+      "discountVnd": 200000,
+      "label": "Khách thân thiết - 3 hóa đơn"
+    },
+    {
+      "minInvoices": 2,
+      "discountVnd": 150000,
+      "label": "Khách thân thiết - 2 hóa đơn"
+    },
+    {
+      "minInvoices": 1,
+      "discountVnd": 100000,
+      "label": "Khách thân thiết - 1 hóa đơn"
+    }
+  ],
+  "warrantyVouchers": [
+    {
+      "warrantyType": "Bảo Hành CARE⁺ PRO MAX",
+      "discountVnd": 300000,
+      "label": "Ưu đãi Care+ Pro Max còn hạn"
+    }
+  ]
+}

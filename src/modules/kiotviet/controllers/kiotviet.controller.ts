@@ -25,6 +25,8 @@ import {
   GetInvoicesByUserResponseDto,
 } from '../dto/get-invoices-by-user.dto';
 import { KiotVietWebhookExampleDto } from '../dto/kiotviet-webhook.dto';
+import { VoucherRequestDto } from '../dto/voucher-request.dto';
+import { VoucherResponseDto } from '../dto/voucher-response.dto';
 
 @ApiTags('KiotViet - Tra cứu bảo hành')
 @Controller('kiotviet')
@@ -101,6 +103,28 @@ export class KiotVietController {
     @Query() query: GetInvoicesByUserQueryDto,
   ): Promise<GetInvoicesByUserResponseDto> {
     return this.kiotVietService.getInvoicesByUser(query);
+  }
+
+  @Public()
+  @Post('vouchers')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: 'Tính voucher khách hàng theo số điện thoại',
+    description:
+      'Lấy toàn bộ hóa đơn hoàn thành của khách từ KiotViet, áp rule voucher từ config JSON (tier số hóa đơn + Care+ Pro Max còn hạn) và trả về voucher có giá trị cao nhất.',
+  })
+  @ApiBody({ type: VoucherRequestDto })
+  @ApiResponse({
+    status: 200,
+    description: 'Thông tin voucher tính được cho khách',
+    type: VoucherResponseDto,
+  })
+  @ApiResponse({ status: 400, description: 'Thiếu số điện thoại' })
+  @ApiResponse({ status: 500, description: 'KiotViet chưa cấu hình hoặc lỗi hệ thống' })
+  async calculateVoucher(
+    @Body() dto: VoucherRequestDto,
+  ): Promise<VoucherResponseDto> {
+    return this.kiotVietService.calculateVoucherByPhone(dto.phone);
   }
 
   @Public()
