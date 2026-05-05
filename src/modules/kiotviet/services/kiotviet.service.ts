@@ -3,8 +3,8 @@ import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { Telegraf } from 'telegraf';
 import { firstValueFrom } from 'rxjs';
-import * as fs from 'fs';
-import * as path from 'path';
+import { VoucherConditionType, VoucherRule } from '@prisma/client';
+import { PrismaService } from '../../../database/prisma.service';
 import { SearchInvoiceDto } from '../dto/search-invoice.dto';
 import { InvoiceResponseDto } from '../dto/invoice-response.dto';
 import { WarrantyInfoDto } from '../dto/warranty.dto';
@@ -124,24 +124,6 @@ interface GoogleScriptInvoiceResponse {
   };
 }
 
-interface VoucherInvoiceCountTier {
-  minInvoices: number;
-  discountVnd: number;
-  label: string;
-}
-
-interface VoucherWarrantyRule {
-  warrantyType: string;
-  discountVnd: number;
-  label: string;
-}
-
-interface VoucherRulesConfig {
-  version: number;
-  currency: string;
-  invoiceCountTiers: VoucherInvoiceCountTier[];
-  warrantyVouchers: VoucherWarrantyRule[];
-}
 
 @Injectable()
 export class KiotVietService {
@@ -152,11 +134,11 @@ export class KiotVietService {
   /** Telegraf chỉ dùng `telegram.sendMessage` (không `launch`). */
   private telegramBot: Telegraf | null = null;
   private telegramBotToken: string | null = null;
-  private voucherRulesCache: VoucherRulesConfig | null = null;
 
   constructor(
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
+    private readonly prisma: PrismaService,
   ) { }
 
   private get retailer(): string {
@@ -1553,36 +1535,71 @@ export class KiotVietService {
   }
 
   // ---------------------------------------------------------------------------
-  // Voucher rules config
+  // Voucher rules — đánh giá từng rule dựa trên conditionType + conditionParams
   // ---------------------------------------------------------------------------
 
-  private loadVoucherRules(): VoucherRulesConfig {
-    if (this.voucherRulesCache) {
-      return this.voucherRulesCache;
+  /**
+   * Kiểm tra một rule có thoả điều kiện với context hiện tại không.
+   * - INVOICE_COUNT_TIER: conditionValue là số (vd "1", "4"), parse sang Int → so sánh totalInvoices >=
+   * - WARRANTY_ACTIVE  : conditionValue là tên gói bảo hành (vd "Bảo Hành CARE⁺ PRO MAX")
+   * Mở rộng: thêm case mới khi thêm conditionType mới trong enum.
+   */
+  private evaluateVoucherRule(
+    rule: VoucherRule,
+    context: { totalInvoices: number; enrichedInvoices: InvoiceResponseDto[] },
+  ): boolean {
+    switch (rule.conditionType) {
+      case VoucherConditionType.INVOICE_COUNT_TIER: {
+        const minInvoices = parseInt(rule.conditionValue, 10);
+        if (Number.isNaN(minInvoices)) {
+          this.logger.warn(
+            `Rule ${rule.id} INVOICE_COUNT_TIER có conditionValue không phải số: "${rule.conditionValue}"`,
+          );
+          return false;
+        }
+        return context.totalInvoices >= minInvoices;
+      }
+      case VoucherConditionType.WARRANTY_ACTIVE: {
+        const warrantyType = rule.conditionValue;
+        if (!warrantyType) return false;
+        return context.enrichedInvoices.some(
+          (inv) =>
+            inv.warranty?.warrantyType === warrantyType &&
+            inv.warranty?.status === 'Còn hiệu lực',
+        );
+      }
+      default: {
+        this.logger.warn(
+          `Unknown voucher conditionType: ${rule.conditionType as string} (rule ${rule.id})`,
+        );
+        return false;
+      }
     }
-
-    const configPath = path.join(
-      __dirname,
-      '..',
-      'config',
-      'voucher-rules.json',
-    );
-    const raw = fs.readFileSync(configPath, 'utf-8');
-    const config: VoucherRulesConfig = JSON.parse(raw);
-
-    // Đảm bảo tier luôn sắp xếp giảm dần để lấy match đầu tiên >= threshold
-    config.invoiceCountTiers = [...config.invoiceCountTiers].sort(
-      (a, b) => b.minInvoices - a.minInvoices,
-    );
-
-    this.voucherRulesCache = config;
-    return config;
   }
 
-  /** Xoá cache để lần đọc tiếp theo sẽ reload từ file (dùng cho API edit config sau này). */
-  reloadVoucherRules(): void {
-    this.voucherRulesCache = null;
-    this.logger.log('Voucher rules cache invalidated');
+  /**
+   * Với conditionType = INVOICE_COUNT_TIER và nhiều rule cùng match (vd khách 4 đơn
+   * thoả tier 1,2,3,4), chỉ giữ lại rule có discountVnd cao nhất trong nhóm để
+   * tránh "spam candidate". Các loại khác giữ tất cả.
+   */
+  private dedupeInvoiceCountTier(
+    rules: VoucherRule[],
+    context: { totalInvoices: number; enrichedInvoices: InvoiceResponseDto[] },
+  ): VoucherRule[] {
+    const tierMatches = rules
+      .filter((r) => r.conditionType === VoucherConditionType.INVOICE_COUNT_TIER)
+      .filter((r) => this.evaluateVoucherRule(r, context));
+    const otherMatches = rules
+      .filter((r) => r.conditionType !== VoucherConditionType.INVOICE_COUNT_TIER)
+      .filter((r) => this.evaluateVoucherRule(r, context));
+
+    const bestTier = tierMatches.reduce<VoucherRule | null>((best, cur) => {
+      if (!best) return cur;
+      if (cur.discountVnd > best.discountVnd) return cur;
+      return best;
+    }, null);
+
+    return [...(bestTier ? [bestTier] : []), ...otherMatches];
   }
 
   // ---------------------------------------------------------------------------
@@ -1666,20 +1683,28 @@ export class KiotVietService {
       );
     }
 
-    const rules = this.loadVoucherRules();
+    const trimmed = phone.trim();
 
-    const token = await this.getAccessToken();
+    // Load rules song song với fetch token để giảm latency
+    const [rules, token] = await Promise.all([
+      this.prisma.voucherRule.findMany({
+        where: { isActive: true },
+        orderBy: { discountVnd: 'desc' },
+      }),
+      this.getAccessToken(),
+    ]);
+
     const headers = {
       Retailer: this.retailer,
       Authorization: `Bearer ${token}`,
     };
 
     const { customerId, customerName, invoices } =
-      await this.fetchAllInvoicesByPhone(phone.trim(), headers);
+      await this.fetchAllInvoicesByPhone(trimmed, headers);
 
     if (!customerId) {
       return {
-        phone: phone.trim(),
+        phone: trimmed,
         customerId: undefined,
         customerName: undefined,
         totalInvoices: 0,
@@ -1688,58 +1713,45 @@ export class KiotVietService {
       };
     }
 
-    // Map qua calculateWarranty để có warranty.warrantyType + warranty.status
-    const enrichedInvoices = invoices.map((inv) =>
-      this.calculateWarranty(inv),
-    );
-
-    const candidates: VoucherCandidateDto[] = [];
-
-    // Candidate 1: tier theo số hóa đơn
+    // Enrich warranty info
+    const enrichedInvoices = invoices.map((inv) => this.calculateWarranty(inv));
     const totalInvoices = enrichedInvoices.length;
-    const matchedTier = rules.invoiceCountTiers.find(
-      (tier) => totalInvoices >= tier.minInvoices,
-    );
-    if (matchedTier) {
-      candidates.push({
-        source: 'INVOICE_COUNT',
-        discountVnd: matchedTier.discountVnd,
-        label: matchedTier.label,
-      });
-    }
 
-    // Candidate 2: warranty còn hạn
-    for (const rule of rules.warrantyVouchers) {
-      const hasActive = enrichedInvoices.some(
-        (inv) =>
-          inv.warranty?.warrantyType === rule.warrantyType &&
-          inv.warranty?.status === 'Còn hiệu lực',
-      );
+    // Đánh giá tất cả rule, dedupe nhóm INVOICE_COUNT_TIER (chỉ giữ tier cao nhất)
+    const matchedRules = this.dedupeInvoiceCountTier(rules, {
+      totalInvoices,
+      enrichedInvoices,
+    });
 
-      if (hasActive) {
-        candidates.push({
-          source: 'WARRANTY',
-          discountVnd: rule.discountVnd,
-          label: rule.label,
-        });
+    const candidates: VoucherCandidateDto[] = matchedRules.map((r) => ({
+      ruleId: r.id,
+      conditionType: r.conditionType,
+      discountVnd: r.discountVnd,
+      label: r.name,
+      flags: r.flags ?? [],
+    }));
+
+    // Chọn voucher tốt nhất: discountVnd cao nhất.
+    // Hoà giá trị → giữ rule đầu tiên match (theo orderBy discountVnd desc của query).
+    let bestRule: VoucherRule | null = null;
+    for (const r of matchedRules) {
+      if (!bestRule || r.discountVnd > bestRule.discountVnd) {
+        bestRule = r;
       }
     }
 
-    // Chọn voucher có discountVnd cao nhất; nếu hoà ưu tiên WARRANTY
-    let bestVoucher: VoucherDto | null = null;
-    for (const c of candidates) {
-      if (
-        !bestVoucher ||
-        c.discountVnd > bestVoucher.discountVnd ||
-        (c.discountVnd === bestVoucher.discountVnd &&
-          c.source === 'WARRANTY')
-      ) {
-        bestVoucher = { discountVnd: c.discountVnd, label: c.label, source: c.source };
+    const bestVoucher: VoucherDto | null = bestRule
+      ? {
+        ruleId: bestRule.id,
+        discountVnd: bestRule.discountVnd,
+        label: bestRule.name,
+        conditionType: bestRule.conditionType,
+        flags: bestRule.flags ?? [],
       }
-    }
+      : null;
 
     return {
-      phone: phone.trim(),
+      phone: trimmed,
       customerId,
       customerName: customerName ?? undefined,
       totalInvoices,

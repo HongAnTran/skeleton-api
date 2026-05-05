@@ -1,13 +1,14 @@
 import { ApiProperty } from '@nestjs/swagger';
 
-export type VoucherSource = 'INVOICE_COUNT' | 'WARRANTY' | 'NONE';
-
 export class VoucherCandidateDto {
+  @ApiProperty({ description: 'ID rule trong DB' })
+  ruleId: string;
+
   @ApiProperty({
-    description: 'Nguồn voucher',
-    enum: ['INVOICE_COUNT', 'WARRANTY'],
+    description: 'Loại điều kiện (giá trị enum VoucherConditionType)',
+    example: 'WARRANTY_ACTIVE',
   })
-  source: 'INVOICE_COUNT' | 'WARRANTY';
+  conditionType: string;
 
   @ApiProperty({ description: 'Số tiền giảm (VND)', example: 300000 })
   discountVnd: number;
@@ -17,9 +18,19 @@ export class VoucherCandidateDto {
     example: 'Ưu đãi Care+ Pro Max còn hạn',
   })
   label: string;
+
+  @ApiProperty({
+    description: 'Cờ tùy biến gắn với rule',
+    example: ['careProMax'],
+    type: [String],
+  })
+  flags: string[];
 }
 
 export class VoucherDto {
+  @ApiProperty({ description: 'ID rule được áp dụng' })
+  ruleId: string;
+
   @ApiProperty({ description: 'Số tiền giảm (VND)', example: 300000 })
   discountVnd: number;
 
@@ -30,10 +41,17 @@ export class VoucherDto {
   label: string;
 
   @ApiProperty({
-    description: 'Nguồn quyết định voucher',
-    enum: ['INVOICE_COUNT', 'WARRANTY', 'NONE'],
+    description: 'Loại điều kiện đã match',
+    example: 'WARRANTY_ACTIVE',
   })
-  source: VoucherSource;
+  conditionType: string;
+
+  @ApiProperty({
+    description: 'Cờ tùy biến gắn với rule',
+    example: ['careProMax'],
+    type: [String],
+  })
+  flags: string[];
 }
 
 export class VoucherResponseDto {
@@ -48,7 +66,6 @@ export class VoucherResponseDto {
 
   @ApiProperty({ description: 'Tổng số hóa đơn đã hoàn thành', example: 3 })
   totalInvoices: number;
-
 
   @ApiProperty({
     description: 'Voucher được áp dụng (null nếu không đủ điều kiện)',

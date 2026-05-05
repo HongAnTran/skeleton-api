@@ -297,6 +297,26 @@ enum LeaveRequestStatus {
 }
 
 
+enum VoucherConditionType {
+  INVOICE_COUNT_TIER
+  WARRANTY_ACTIVE
+}
+
+model VoucherRule {
+  id             String               @id @default(cuid())
+  name           String
+  conditionType  VoucherConditionType
+  conditionValue String
+  discountVnd    Int
+  flags          String[]             @default([])
+  isActive       Boolean              @default(true)
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+
+  @@index([conditionType, isActive])
+  @@index([isActive])
+}
+
 model LeaveRequest {
   id            String              @id @default(cuid())
   employeeId    String
