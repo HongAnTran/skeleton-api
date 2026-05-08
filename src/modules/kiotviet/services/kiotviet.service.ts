@@ -20,7 +20,7 @@ import {
   KiotVietWebhookExampleDto,
   KiotVietWebhookInvoiceDataDto,
   KiotVietWebhookInvoiceDetailDto,
-} from 'src/modules/kiotviet/dto/kiotviet-webhook.dto';
+} from '../dto/kiotviet-webhook.dto';
 import {
   VoucherResponseDto,
   VoucherCandidateDto,
@@ -1612,6 +1612,7 @@ export class KiotVietService {
   ): Promise<{
     customerId: number | null;
     customerName: string | null;
+    customerComments: string | null;
     invoices: InvoiceResponseDto[];
   }> {
     // Bước 1: tìm khách hàng theo SĐT
@@ -1629,11 +1630,11 @@ export class KiotVietService {
       }),
     );
 
-    const customers: Array<{ id: number; name: string; code: string }> =
+    const customers: Array<{ id: number; name: string; code: string, comments: string }> =
       customerResponse.data?.data || [];
 
     if (customers.length === 0) {
-      return { customerId: null, customerName: null, invoices: [] };
+      return { customerId: null, customerName: null, customerComments: null, invoices: [] };
     }
 
     const customerIds = customers.map((c) => c.id).join(',');
@@ -1660,6 +1661,7 @@ export class KiotVietService {
     return {
       customerId: primaryCustomer.id,
       customerName: primaryCustomer.name,
+      customerComments: primaryCustomer.comments,
       invoices: data?.data ?? [],
     };
   }
@@ -1699,7 +1701,7 @@ export class KiotVietService {
       Authorization: `Bearer ${token}`,
     };
 
-    const { customerId, customerName, invoices } =
+    const { customerId, customerName, customerComments, invoices } =
       await this.fetchAllInvoicesByPhone(trimmed, headers);
 
     if (!customerId) {
@@ -1754,6 +1756,7 @@ export class KiotVietService {
       phone: trimmed,
       customerId,
       customerName: customerName ?? undefined,
+      customerComments: customerComments ?? '',
       totalInvoices,
       voucher: bestVoucher,
       candidates,

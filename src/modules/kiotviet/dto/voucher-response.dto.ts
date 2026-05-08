@@ -64,6 +64,9 @@ export class VoucherResponseDto {
   @ApiProperty({ description: 'Tên khách hàng', required: false })
   customerName?: string;
 
+  @ApiProperty({ description: 'Comments khách hàng', required: false })
+  customerComments?: string;
+
   @ApiProperty({ description: 'Tổng số hóa đơn đã hoàn thành', example: 3 })
   totalInvoices: number;
 
