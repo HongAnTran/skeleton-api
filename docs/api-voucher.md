@@ -151,12 +151,16 @@ GET /voucher-rules?conditionType=INVOICE_COUNT_TIER
 GET /voucher-rules?conditionType=WARRANTY_ACTIVE&isActive=true
 ```
 
+Endpoint **public**, HTTP 200. Trả về **mảng** `VoucherRuleResponseDto[]` (không phân trang).
+
 #### Query params (tất cả optional)
 
 | Param | Kiểu | Mô tả |
 |-------|------|--------|
-| `conditionType` | `INVOICE_COUNT_TIER \| WARRANTY_ACTIVE` | Lọc theo loại điều kiện |
-| `isActive` | `boolean` (`true` / `false`) | Lọc theo trạng thái. Bỏ trống = lấy tất cả |
+| `conditionType` | `INVOICE_COUNT_TIER \| WARRANTY_ACTIVE` | Lọc theo loại điều kiện. Giá trị ngoài enum → `400`. |
+| `isActive` | `boolean` (`true` / `false`) | Lọc theo trạng thái. **Chỉ chấp nhận chuỗi `"true"` / `"false"`**; bất kỳ giá trị nào khác bị bỏ qua = lấy tất cả. |
+
+> **Sắp xếp**: kết quả luôn order theo `conditionType` (A→Z), rồi `discountVnd` tăng dần. FE không cần (và không thể) đổi thứ tự qua query.
 
 #### Response 200
 
@@ -186,6 +190,38 @@ GET /voucher-rules?conditionType=WARRANTY_ACTIVE&isActive=true
   }
 ]
 ```
+
+Mảng rỗng `[]` nếu không có rule nào khớp bộ lọc (HTTP vẫn 200).
+
+#### Mô tả các trường response (`VoucherRuleResponseDto`)
+
+| Trường | Kiểu | Mô tả |
+|--------|------|--------|
+| `id` | `string` | ID rule (cuid) |
+| `name` | `string` | Nhãn hiển thị |
+| `conditionType` | `INVOICE_COUNT_TIER \| WARRANTY_ACTIVE` | Loại điều kiện |
+| `conditionValue` | `string` | Giá trị điều kiện: số đơn (`"3"`) với tier, hoặc tên gói bảo hành với warranty |
+| `discountVnd` | `number` | Số tiền giảm (VND) |
+| `flags` | `string[]` | Cờ tùy biến cho FE (vd `["careProMax"]`). Có thể rỗng |
+| `isActive` | `boolean` | Rule đang bật hay tắt |
+| `createdAt` | `string` (ISO date) | Thời điểm tạo |
+| `updatedAt` | `string` (ISO date) | Thời điểm cập nhật gần nhất |
+
+#### Ví dụ gọi API
+
+```bash
+# Tất cả rule
+curl https://api.hitaothom.com/voucher-rules
+
+# Chỉ rule đang bật, loại theo số hóa đơn
+curl "https://api.hitaothom.com/voucher-rules?isActive=true&conditionType=INVOICE_COUNT_TIER"
+```
+
+#### Lỗi
+
+| HTTP | Khi nào |
+|------|---------|
+| `400` | `conditionType` không thuộc enum (`INVOICE_COUNT_TIER` / `WARRANTY_ACTIVE`) |
 
 ---
 

@@ -57,6 +57,12 @@ export class InvoiceResponseDto {
   @ApiProperty({ description: 'Trạng thái', required: false })
   status?: number;
 
+  @ApiProperty({ description: 'ID nhân viên bán hàng', required: false })
+  soldById?: number;
+
+  @ApiProperty({ description: 'Tên nhân viên bán hàng', required: false })
+  soldByName?: string;
+
   @ApiProperty({
     description: 'Thông tin khách hàng',
     type: InvoiceCustomerDto,
