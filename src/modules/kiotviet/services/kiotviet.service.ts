@@ -1169,18 +1169,6 @@ export class KiotVietService {
         this.logger.log(`Searching by serial: ${searchValue}`);
         invoices = await this.searchInvoicesBySerial(searchValue, headers);
       }
-
-      try {
-        // Nếu không tìm thấy từ KiotViet, tìm trong Google Apps Script
-        if (invoices.length === 0) {
-          const googleScriptInvoices =
-            await this.searchInvoicesFromGoogleScript(searchValue);
-          return googleScriptInvoices;
-        }
-      } catch {
-        return [];
-      }
-
       // Tính toán thông tin bảo hành cho mỗi hóa đơn
       return invoices.map((invoice) => this.calculateWarranty(invoice));
     } catch (error) {
@@ -1310,109 +1298,6 @@ export class KiotVietService {
     }
   }
 
-  /**
-   * Tìm hóa đơn từ Google Apps Script
-   */
-  private async searchInvoicesFromGoogleScript(
-    phoneOrSerial: string,
-  ): Promise<InvoiceResponseDto[]> {
-    try {
-      const googleScriptUrl =
-        'https://script.google.com/macros/s/AKfycbxccioFGEPfzL0yRc51iokwjr0NeizWn3VOLDGlfRt8KV4-UVLqm0oZPLJGWn4j_XBN/exec';
-
-      const response = await firstValueFrom(
-        this.httpService.get<GoogleScriptInvoiceResponse>(googleScriptUrl, {
-          params: {
-            phoneOrSerial: phoneOrSerial,
-          },
-        }),
-      );
-
-      // Kiểm tra nếu có lỗi hoặc không có dữ liệu
-      if (!response.data || (response.data as any).error) {
-        return [];
-      }
-
-      // Map response sang InvoiceResponseDto
-      const invoice = this.mapGoogleScriptResponseToInvoiceDto(response.data);
-      return invoice ? [invoice] : [];
-    } catch (error) {
-      this.logger.error(
-        'Failed to search invoices from Google Apps Script',
-        error,
-      );
-      // Không throw error, chỉ log và trả về mảng rỗng
-      return [];
-    }
-  }
-
-  /**
-   * Map response từ Google Apps Script sang InvoiceResponseDto
-   */
-  private mapGoogleScriptResponseToInvoiceDto(
-    data: GoogleScriptInvoiceResponse,
-  ): InvoiceResponseDto | null {
-    if (!data || !data.customer || !data.invoiceDetails) {
-      return null;
-    }
-
-    // Map invoiceDetails
-    const invoiceDetails = data.invoiceDetails.map((detail) => ({
-      productId: 0, // Google Script không có productId
-      productName: detail.productName || '',
-      productCode: detail.serialOrSku || '',
-      quantity: detail.quantity || 1,
-      price: detail.price || 0,
-      subTotal: detail.total || 0,
-      serialNumbers: detail.serialOrSku ? [detail.serialOrSku] : [],
-    }));
-
-    // Map warranty nếu có
-    let warranty: WarrantyInfoDto | undefined;
-    if (data.warranty && data.warranty.packageName && data.warranty.date) {
-      const warrantyDays = parseInt(data.warranty.date, 10) || 0;
-      const purchaseDate = new Date(data.createdDate);
-      const warrantyStartDate = new Date(purchaseDate);
-      warrantyStartDate.setHours(0, 0, 0, 0);
-
-      const warrantyEndDate = new Date(warrantyStartDate);
-      warrantyEndDate.setDate(warrantyEndDate.getDate() + warrantyDays);
-
-      const now = new Date();
-      now.setHours(0, 0, 0, 0);
-
-      const remainingDays = Math.max(
-        0,
-        Math.ceil(
-          (warrantyEndDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-        ),
-      );
-
-      warranty = {
-        warrantyDays,
-        warrantyStartDate: warrantyStartDate.toISOString(),
-        warrantyEndDate: warrantyEndDate.toISOString(),
-        remainingDays,
-        warrantyType: data.warranty.packageName,
-        status: remainingDays > 0 ? 'Còn hiệu lực' : 'Hết hạn',
-      };
-    }
-
-    return {
-      id: data.id || 0,
-      code: data.code || '',
-      createdDate: data.createdDate,
-      total: data.total || 0,
-      totalPayment: data.totalPayment || 0,
-      status: data.status || undefined,
-      customerId: 0,
-      customerCode: '',
-      customerName: data.customer.name || '',
-      invoiceDetails,
-      note: data.note,
-      warranty,
-    };
-  }
 
   /**
    * Kiểm tra xem một sản phẩm có phải là sản phẩm bảo hành không
