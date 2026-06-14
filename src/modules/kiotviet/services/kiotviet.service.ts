@@ -215,7 +215,13 @@ export class KiotVietService {
 
       for (const notification of body.Notifications ?? []) {
         for (const invoice of notification.Data ?? []) {
+          this.logger.log(
+            `Xử lý invoice Code=${invoice.Code} Status=${invoice.Status} SoldById=${invoice.SoldById} PurchaseDate=${invoice.PurchaseDate}`,
+          );
           if (!NOTIFY_STATUSES.has(invoice.Status)) {
+            this.logger.log(
+              `Bỏ qua invoice ${invoice.Code}: Status=${invoice.Status} không thuộc {1,2}`,
+            );
             continue;
           }
           const today = new Date();
@@ -223,13 +229,21 @@ export class KiotVietService {
           const purchaseDate = new Date(invoice.PurchaseDate);
           purchaseDate.setHours(0, 0, 0, 0);
           if (purchaseDate.getTime() !== today.getTime()) {
+            this.logger.log(
+              `Bỏ qua invoice ${invoice.Code}: PurchaseDate không phải hôm nay`,
+            );
             continue;
           }
+          this.logger.log(`Bắt đầu build tin nhắn cho invoice ${invoice.Code}`);
           const html =
             invoice.Status === 2
               ? this.buildCancelledInvoiceTelegramHtml(invoice)
               : await this.buildSaleNotificationTelegramHtml(invoice);
+          this.logger.log(
+            `Build xong invoice ${invoice.Code} (độ dài HTML=${html.length}), bắt đầu gửi Telegram`,
+          );
           await this.sendTelegramMessage(token.trim(), chatId.trim(), html, chatId2.trim());
+          this.logger.log(`Đã xử lý xong invoice ${invoice.Code}`);
         }
       }
     } catch (error) {
@@ -380,30 +394,36 @@ export class KiotVietService {
       return { brand: '', categoryName: '' };
     }
 
-    const product = await firstValueFrom(
-      this.httpService.get<{ tradeMarkId: number, categoryName: string }>(
-        `${this.baseUrl}/products/${detail.ProductId}`,
-        {
-          headers: {
-            Retailer: this.retailer,
-            Authorization: `Bearer ${await this.getAccessToken()}`,
+    // Lỗi tra cứu sản phẩm không được làm hỏng cả tin nhắn — trả về rỗng để gửi tiếp
+    try {
+      const product = await firstValueFrom(
+        this.httpService.get<{ tradeMarkId: number, categoryName: string }>(
+          `${this.baseUrl}/products/${detail.ProductId}`,
+          {
+            headers: {
+              Retailer: this.retailer,
+              Authorization: `Bearer ${await this.getAccessToken()}`,
+            },
           },
-        },
-      ),
-    );
+        ),
+      );
 
-    const tradeMarkId = product.data?.tradeMarkId || 0
+      const tradeMarkId = product.data?.tradeMarkId || 0
 
-    let categoryName = product.data?.categoryName || '';
+      let categoryName = product.data?.categoryName || '';
 
 
-    let brand = '';
-    if (tradeMarkId) {
-      brand =
-        (await this.fetchTrademarkNameById(tradeMarkId));
+      let brand = '';
+      if (tradeMarkId) {
+        brand =
+          (await this.fetchTrademarkNameById(tradeMarkId));
+      }
+
+      return { brand, categoryName };
+    } catch (error) {
+      this.logger.error('fetchProductDescriptionForLine failed', error);
+      return { brand: '', categoryName: '' };
     }
-
-    return { brand, categoryName };
   }
 
   private async buildProductSectionHtml(
@@ -449,28 +469,31 @@ export class KiotVietService {
       return '';
     }
 
-    const customer = await firstValueFrom(
-      this.httpService.get<{ name: string, contactNumber: string, email: string, address: string, code: string, birthDate: string }>(
-        `${this.baseUrl}/customers/${customerId}`,
-        {
-          headers: {
-            Retailer: this.retailer,
-            Authorization: `Bearer ${await this.getAccessToken()}`,
-          }
-        },
-      ),
-    );
+    // Lỗi tra cứu khách hàng không được làm hỏng cả tin nhắn — trả rỗng để dùng CustomerName
+    try {
+      const customer = await firstValueFrom(
+        this.httpService.get<{ name: string, contactNumber: string, email: string, address: string, code: string, birthDate: string }>(
+          `${this.baseUrl}/customers/${customerId}`,
+          {
+            headers: {
+              Retailer: this.retailer,
+              Authorization: `Bearer ${await this.getAccessToken()}`,
+            }
+          },
+        ),
+      );
 
-    const contactNumber = customer.data.contactNumber ? `${customer.data.contactNumber}` : '';
-    const address = customer.data.address ? customer.data.address : '';
-    const birthDate = customer.data.birthDate ? customer.data.birthDate : '';
+      const contactNumber = customer.data.contactNumber ? `${customer.data.contactNumber}` : '';
+      const address = customer.data.address ? customer.data.address : '';
+      const birthDate = customer.data.birthDate ? customer.data.birthDate : '';
 
-    const birthDateStr = birthDate ? new Date(birthDate).toLocaleDateString('vi-VN') : '';
+      const birthDateStr = birthDate ? new Date(birthDate).toLocaleDateString('vi-VN') : '';
 
-
-
-
-    return customer.data.name + '\n' + contactNumber + '\n' + address + '\n' + birthDateStr;
+      return customer.data.name + '\n' + contactNumber + '\n' + address + '\n' + birthDateStr;
+    } catch (error) {
+      this.logger.error('fetchCustomerInfo failed', error);
+      return '';
+    }
   }
 
   private async buildCustomerSectionHtml(invoice: KiotVietWebhookInvoiceDataDto): Promise<string> {
@@ -565,10 +588,16 @@ export class KiotVietService {
    */
   private async countTodayInvoicesBySoldBy(soldById: number): Promise<number> {
     if (!soldById || !this.retailer || !this.clientId || !this.clientSecret) {
+      this.logger.log(
+        `countTodayInvoicesBySoldBy: bỏ qua (soldById=${soldById} hoặc thiếu cấu hình)`,
+      );
       return 0;
     }
 
     try {
+      this.logger.log(
+        `countTodayInvoicesBySoldBy: bắt đầu đếm đơn cho soldById=${soldById}`,
+      );
       const token = await this.getAccessToken();
       const headers = {
         Retailer: this.retailer,
@@ -580,12 +609,15 @@ export class KiotVietService {
       const now = new Date();
 
       const pageSize = 100;
+      const MAX_PAGES = 10; // chặn quét vô hạn để không làm chậm/khóa webhook
       let currentItem = 0;
       let total: number | null = null;
       let count = 0;
+      let pages = 0;
 
       // API không hỗ trợ filter soldById nên lọc phía backend (giống getInvoicesByUser)
       do {
+        pages += 1;
         const response = await firstValueFrom(
           this.httpService.get<{ data: KiotVietRawInvoice[]; total: number }>(
             `${this.baseUrl}/invoices`,
@@ -606,19 +638,32 @@ export class KiotVietService {
         const pageData = response.data?.data ?? [];
         if (total == null) total = response.data?.total ?? 0;
 
-        count += pageData.filter(
+        const pageMatch = pageData.filter(
           (inv) => Number((inv as any).soldById) === Number(soldById),
         ).length;
+        count += pageMatch;
+        this.logger.log(
+          `countTodayInvoicesBySoldBy: page ${pages} currentItem=${currentItem} nhận=${pageData.length}/total=${total} khớp soldById=${pageMatch} (cộng dồn=${count})`,
+        );
 
         if (
           pageData.length < pageSize ||
-          currentItem + pageSize >= (total || 0)
+          currentItem + pageSize >= (total || 0) ||
+          pages >= MAX_PAGES
         ) {
+          if (pages >= MAX_PAGES && currentItem + pageSize < (total || 0)) {
+            this.logger.warn(
+              `countTodayInvoicesBySoldBy: đạt giới hạn ${MAX_PAGES} trang nhưng còn dữ liệu (total=${total}), kết quả có thể thiếu`,
+            );
+          }
           break;
         }
         currentItem += pageSize;
       } while (true);
 
+      this.logger.log(
+        `countTodayInvoicesBySoldBy: soldById=${soldById} → tổng ${count} đơn hôm nay`,
+      );
       return count;
     } catch (error) {
       this.logger.error('countTodayInvoicesBySoldBy failed', error);
@@ -715,17 +760,29 @@ export class KiotVietService {
 
     try {
       const bot = this.getTelegraf(botToken);
-      // vieets promise all cái nào lỗi thì bỏ qua
-      await Promise.all([
-        bot.telegram.sendMessage(chatId, text, {
-          parse_mode: 'HTML',
-          link_preview_options: { is_disabled: true },
-        }),
-        bot.telegram.sendMessage(chatId2, text, {
-          parse_mode: 'HTML',
-          link_preview_options: { is_disabled: true },
-        }),
-      ]);
+      const targets = [chatId, chatId2].filter((id) => id?.trim());
+      this.logger.log(
+        `Gửi Telegram tới ${targets.length} chat: ${targets.join(', ')}`,
+      );
+      // cái nào lỗi thì bỏ qua (allSettled để 1 chat lỗi không chặn chat còn lại)
+      const results = await Promise.allSettled(
+        targets.map((id) =>
+          bot.telegram.sendMessage(id, text, {
+            parse_mode: 'HTML',
+            link_preview_options: { is_disabled: true },
+          }),
+        ),
+      );
+      results.forEach((r, i) => {
+        if (r.status === 'fulfilled') {
+          this.logger.log(`Gửi Telegram thành công tới chat ${targets[i]}`);
+        } else {
+          this.logger.error(
+            `Gửi Telegram thất bại tới chat ${targets[i]}`,
+            r.reason,
+          );
+        }
+      });
     } catch (error) {
       this.logger.error('Gửi Telegram thất bại', error);
     }
