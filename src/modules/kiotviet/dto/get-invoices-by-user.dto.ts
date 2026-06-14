@@ -139,6 +139,63 @@ export class IphoneSalesReportDto {
   detailRows: IphoneDetailRowDto[];
 }
 
+export class IphoneInventoryDetailRowDto {
+  @ApiProperty({ example: 'iPhone 16 Pro Max' })
+  modelName: string;
+
+  @ApiProperty({ example: '256GB' })
+  storage: string;
+
+  @ApiProperty({ example: 'Desert Titanium' })
+  color: string;
+
+  @ApiProperty({
+    description: 'lock | international | unknown',
+    example: 'lock',
+  })
+  marketType: string;
+
+  @ApiProperty({
+    description: 'Nhóm hàng gốc từ KiotViet (nếu có)',
+    required: false,
+  })
+  productGroup?: string;
+
+  @ApiProperty({ description: 'Số lượng tồn kho (onHand)' })
+  onHand: number;
+}
+
+export class IphoneInventoryBranchDto {
+  @ApiProperty({ description: 'ID chi nhánh' })
+  branchId: number;
+
+  @ApiProperty({ description: 'Tên chi nhánh' })
+  branchName: string;
+
+  @ApiProperty({ description: 'Tổng tồn kho iPhone của chi nhánh' })
+  totalOnHand: number;
+
+  @ApiProperty({ type: IphoneMarketTotalsDto })
+  byMarket: IphoneMarketTotalsDto;
+
+  @ApiProperty({
+    description: 'Chi tiết tồn theo model + bộ nhớ + màu + loại Lock/QT',
+    type: [IphoneInventoryDetailRowDto],
+  })
+  detailRows: IphoneInventoryDetailRowDto[];
+}
+
+export class IphoneInventoryReportDto {
+  @ApiProperty({ description: 'Tổng tồn kho iPhone tất cả chi nhánh' })
+  totalOnHand: number;
+
+  @ApiProperty({
+    description: 'Tồn kho iPhone chia theo từng chi nhánh',
+    type: [IphoneInventoryBranchDto],
+  })
+  byBranch: IphoneInventoryBranchDto[];
+}
+
 export class UserInvoicesReportDto {
   @ApiProperty({ description: 'Tổng số đơn hàng' })
   totalOrders: number;
@@ -202,6 +259,13 @@ export class UserInvoicesReportDto {
     type: IphoneSalesReportDto,
   })
   iphoneReport: IphoneSalesReportDto;
+
+  @ApiProperty({
+    description:
+      'Báo cáo tồn kho iPhone: số lượng tồn (onHand) của từng loại iPhone, chia theo chi nhánh — lấy từ GET /products?includeInventory=true',
+    type: IphoneInventoryReportDto,
+  })
+  iphoneInventoryReport: IphoneInventoryReportDto;
 }
 
 export class GetInvoicesByUserResponseDto {

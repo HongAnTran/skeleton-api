@@ -14,6 +14,7 @@ import { GetInvoicesByUserQueryDto } from '../dto/get-invoices-by-user.dto';
 import {
   GetInvoicesByUserResponseDto,
   IphoneSalesReportDto,
+  IphoneInventoryReportDto,
   UserInvoicesReportDto,
 } from '../dto/get-invoices-by-user.dto';
 import {
@@ -92,6 +93,42 @@ interface IphoneReportAgg {
       marketType: IphoneMarketKind;
       productGroup?: string;
       quantity: number;
+    }
+  >;
+}
+
+/** GET /products?includeInventory=true — danh sách hàng hóa kèm tồn kho theo chi nhánh (tài liệu 2.4.1). */
+interface KiotVietProductListResponse {
+  total: number;
+  pageSize: number;
+  data: Array<{
+    id: number;
+    code?: string;
+    name?: string;
+    fullName?: string;
+    categoryName?: string;
+    inventories?: Array<{
+      branchId: number;
+      branchName?: string;
+      onHand?: number;
+    }>;
+  }>;
+}
+
+interface IphoneInventoryBranchAgg {
+  branchId: number;
+  branchName: string;
+  totalOnHand: number;
+  byMarket: { lock: number; international: number; unknown: number };
+  detailRows: Map<
+    string,
+    {
+      modelName: string;
+      storage: string;
+      color: string;
+      marketType: IphoneMarketKind;
+      productGroup?: string;
+      onHand: number;
     }
   >;
 }
@@ -897,6 +934,10 @@ export class KiotVietService {
         (inv) => inv.warranty != null,
       ).length;
 
+      // Tồn kho iPhone hiện tại theo chi nhánh (độc lập với khoảng thời gian hóa đơn)
+      const iphoneInventoryReport =
+        await this.fetchIphoneInventoryReport(headers);
+
       const report: UserInvoicesReportDto = {
         totalOrders: iphoneQuantity,
         totalValue,
@@ -915,6 +956,7 @@ export class KiotVietService {
         ),
         revenue: totalValue,
         iphoneReport: this.finalizeIphoneReport(iphoneAgg),
+        iphoneInventoryReport,
       };
 
       return { data, report };
@@ -1125,6 +1167,145 @@ export class KiotVietService {
       byColor,
       detailRows,
     };
+  }
+
+  /**
+   * GET /products?includeInventory=true (phân trang 100/item) — báo cáo tồn kho iPhone
+   * theo chi nhánh. Dùng lại logic phân loại iPhone (parse tên + nhóm Lock/Quốc tế).
+   */
+  private async fetchIphoneInventoryReport(
+    headers: Record<string, string>,
+  ): Promise<IphoneInventoryReportDto> {
+    const pageSize = 100;
+    let currentItem = 0;
+    let totalFromApi: number | null = null;
+    const branchMap = new Map<number, IphoneInventoryBranchAgg>();
+    let fetched = 0;
+
+    do {
+      const response = await firstValueFrom(
+        this.httpService.get<KiotVietProductListResponse>(
+          `${this.baseUrl}/products`,
+          {
+            headers,
+            params: {
+              pageSize,
+              currentItem,
+              includeInventory: true,
+              orderBy: 'name',
+              orderDirection: 'Asc',
+            },
+          },
+        ),
+      );
+
+      const pageData = response.data?.data ?? [];
+      if (totalFromApi == null) totalFromApi = response.data?.total ?? 0;
+
+      for (const product of pageData) {
+        this.accumulateIphoneInventoryProduct(product, branchMap);
+      }
+      fetched += pageData.length;
+
+      if (pageData.length < pageSize || fetched >= (totalFromApi || 0)) {
+        break;
+      }
+      currentItem += pageSize;
+    } while (true);
+
+    return this.finalizeIphoneInventoryReport(branchMap);
+  }
+
+  private accumulateIphoneInventoryProduct(
+    product: KiotVietProductListResponse['data'][number],
+    branchMap: Map<number, IphoneInventoryBranchAgg>,
+  ): void {
+    const productName = String(product?.fullName ?? product?.name ?? '');
+    const parsed = this.parseIphoneProductName(productName);
+    if (!parsed) return;
+
+    const productGroup = String(product?.categoryName ?? '').trim();
+    const market = this.classifyIphoneMarketFromGroup(productGroup);
+
+    for (const inv of product?.inventories ?? []) {
+      const branchId = Number(inv?.branchId);
+      if (!Number.isFinite(branchId)) continue;
+
+      const onHand = Number(inv?.onHand ?? 0);
+      if (!Number.isFinite(onHand) || onHand <= 0) continue;
+
+      const branchName = String(inv?.branchName ?? '').trim();
+      let agg = branchMap.get(branchId);
+      if (!agg) {
+        agg = {
+          branchId,
+          branchName,
+          totalOnHand: 0,
+          byMarket: { lock: 0, international: 0, unknown: 0 },
+          detailRows: new Map(),
+        };
+        branchMap.set(branchId, agg);
+      }
+      if (!agg.branchName && branchName) agg.branchName = branchName;
+
+      agg.totalOnHand += onHand;
+      if (market === 'lock') agg.byMarket.lock += onHand;
+      else if (market === 'international') agg.byMarket.international += onHand;
+      else agg.byMarket.unknown += onHand;
+
+      const dKey = [
+        parsed.modelName,
+        parsed.storage,
+        parsed.color,
+        market,
+      ].join('\0');
+      const existing = agg.detailRows.get(dKey);
+      if (existing) {
+        existing.onHand += onHand;
+        if (!existing.productGroup && productGroup) {
+          existing.productGroup = productGroup;
+        }
+      } else {
+        agg.detailRows.set(dKey, {
+          modelName: parsed.modelName,
+          storage: parsed.storage,
+          color: parsed.color,
+          marketType: market,
+          productGroup: productGroup || undefined,
+          onHand,
+        });
+      }
+    }
+  }
+
+  private finalizeIphoneInventoryReport(
+    branchMap: Map<number, IphoneInventoryBranchAgg>,
+  ): IphoneInventoryReportDto {
+    const byBranch = Array.from(branchMap.values())
+      .map((agg) => ({
+        branchId: agg.branchId,
+        branchName: agg.branchName,
+        totalOnHand: agg.totalOnHand,
+        byMarket: {
+          lockQuantity: agg.byMarket.lock,
+          internationalQuantity: agg.byMarket.international,
+          unknownMarketQuantity: agg.byMarket.unknown,
+        },
+        detailRows: Array.from(agg.detailRows.values()).sort((a, b) => {
+          const m = a.modelName.localeCompare(b.modelName, 'vi');
+          if (m !== 0) return m;
+          const s = a.storage.localeCompare(b.storage, 'vi');
+          if (s !== 0) return s;
+          const c = a.color.localeCompare(b.color, 'vi');
+          if (c !== 0) return c;
+          return a.marketType.localeCompare(b.marketType);
+        }),
+      }))
+      .sort((a, b) => a.branchName.localeCompare(b.branchName, 'vi'));
+
+    const totalOnHand = byBranch.reduce((sum, b) => sum + b.totalOnHand, 0);
+
+    return { totalOnHand, byBranch };
   }
 
   /**
