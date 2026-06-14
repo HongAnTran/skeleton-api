@@ -14,9 +14,9 @@ import { GetInvoicesByUserQueryDto } from '../dto/get-invoices-by-user.dto';
 import {
   GetInvoicesByUserResponseDto,
   IphoneSalesReportDto,
-  IphoneInventoryReportDto,
   UserInvoicesReportDto,
 } from '../dto/get-invoices-by-user.dto';
+import { IphoneInventoryReportDto } from '../dto/iphone-inventory.dto';
 import {
   KiotVietWebhookExampleDto,
   KiotVietWebhookInvoiceDataDto,
@@ -1018,10 +1018,6 @@ export class KiotVietService {
         (inv) => inv.warranty != null,
       ).length;
 
-      // Tồn kho iPhone hiện tại theo chi nhánh (độc lập với khoảng thời gian hóa đơn)
-      const iphoneInventoryReport =
-        await this.fetchIphoneInventoryReport(headers);
-
       const report: UserInvoicesReportDto = {
         totalOrders: iphoneQuantity,
         totalValue,
@@ -1040,7 +1036,6 @@ export class KiotVietService {
         ),
         revenue: totalValue,
         iphoneReport: this.finalizeIphoneReport(iphoneAgg),
-        iphoneInventoryReport,
       };
 
       return { data, report };
@@ -1251,6 +1246,34 @@ export class KiotVietService {
       byColor,
       detailRows,
     };
+  }
+
+  /**
+   * Báo cáo tồn kho iPhone hiện tại theo chi nhánh (lấy từ GET /products?includeInventory=true).
+   */
+  async getIphoneInventoryReport(): Promise<IphoneInventoryReportDto> {
+    if (!this.retailer || !this.clientId || !this.clientSecret) {
+      throw new HttpException(
+        'KiotViet chưa được cấu hình đầy đủ',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
+
+    try {
+      const token = await this.getAccessToken();
+      const headers = {
+        Retailer: this.retailer,
+        Authorization: `Bearer ${token}`,
+      };
+      return await this.fetchIphoneInventoryReport(headers);
+    } catch (error) {
+      if (error instanceof HttpException) throw error;
+      this.logger.error('Failed to get iPhone inventory report', error);
+      throw new HttpException(
+        'Không thể lấy báo cáo tồn kho iPhone từ KiotViet',
+        HttpStatus.INTERNAL_SERVER_ERROR,
+      );
+    }
   }
 
   /**

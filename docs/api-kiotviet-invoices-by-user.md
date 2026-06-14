@@ -44,7 +44,9 @@ interface GetInvoicesByUserResponse {
 | `warrantyQuantity` | `number` | Tổng quantity các dòng bảo hành. |
 | `warrantyBreakdown` | `WarrantyBreakdownItem[]` | Chi tiết theo loại bảo hành. |
 | `revenue` | `number` | Bằng `totalValue`. |
-| `iphoneReport` | `IphoneSalesReport` | Báo cáo iPhone (parse từ `productName` + nhóm Lock/QT từ `productGroup` / `categoryName`). |
+| `iphoneReport` | `IphoneSalesReport` | Báo cáo iPhone **bán ra** (parse từ `productName` + nhóm Lock/QT từ `productGroup` / `categoryName`). |
+
+> Báo cáo **tồn kho** iPhone đã tách sang endpoint riêng: xem [`api-kiotviet-iphone-inventory.md`](./api-kiotviet-iphone-inventory.md).
 
 ```ts
 interface WarrantyBreakdownItem {

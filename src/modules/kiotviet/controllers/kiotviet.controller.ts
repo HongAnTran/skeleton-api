@@ -24,6 +24,7 @@ import {
   GetInvoicesByUserQueryDto,
   GetInvoicesByUserResponseDto,
 } from '../dto/get-invoices-by-user.dto';
+import { IphoneInventoryReportDto } from '../dto/iphone-inventory.dto';
 import { KiotVietWebhookExampleDto } from '../dto/kiotviet-webhook.dto';
 import { VoucherRequestDto } from '../dto/voucher-request.dto';
 import { VoucherResponseDto } from '../dto/voucher-response.dto';
@@ -103,6 +104,26 @@ export class KiotVietController {
     @Query() query: GetInvoicesByUserQueryDto,
   ): Promise<GetInvoicesByUserResponseDto> {
     return this.kiotVietService.getInvoicesByUser(query);
+  }
+
+  @Public()
+  @Get('inventory/iphone')
+  @ApiOperation({
+    summary: 'Báo cáo tồn kho iPhone theo chi nhánh',
+    description:
+      'Lấy số lượng tồn (onHand) của từng loại iPhone (model / dung lượng / màu, phân loại Lock–Quốc tế), chia theo từng chi nhánh. Nguồn: GET /products?includeInventory=true. Đây là tồn tại thời điểm gọi API.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Báo cáo tồn kho iPhone theo chi nhánh',
+    type: IphoneInventoryReportDto,
+  })
+  @ApiResponse({
+    status: 503,
+    description: 'Không thể kết nối tới KiotViet API',
+  })
+  async getIphoneInventory(): Promise<IphoneInventoryReportDto> {
+    return this.kiotVietService.getIphoneInventoryReport();
   }
 
   @Public()
