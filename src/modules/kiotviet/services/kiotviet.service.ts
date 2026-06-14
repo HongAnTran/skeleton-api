@@ -550,6 +550,82 @@ export class KiotVietService {
     return '';
   }
 
+  /** Định dạng Date sang chuỗi mà KiotViet nhận cho fromPurchaseDate/toPurchaseDate. */
+  private toKiotVietDateTime(d: Date): string {
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return (
+      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
+      `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
+    );
+  }
+
+  /**
+   * Đếm số hóa đơn đã hoàn thành mà nhân viên (soldById) bán trong ngày hôm nay,
+   * tính tới thời điểm gọi — dùng để thống kê kèm tin nhắn Telegram.
+   */
+  private async countTodayInvoicesBySoldBy(soldById: number): Promise<number> {
+    if (!soldById || !this.retailer || !this.clientId || !this.clientSecret) {
+      return 0;
+    }
+
+    try {
+      const token = await this.getAccessToken();
+      const headers = {
+        Retailer: this.retailer,
+        Authorization: `Bearer ${token}`,
+      };
+
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+      const now = new Date();
+
+      const pageSize = 100;
+      let currentItem = 0;
+      let total: number | null = null;
+      let count = 0;
+
+      // API không hỗ trợ filter soldById nên lọc phía backend (giống getInvoicesByUser)
+      do {
+        const response = await firstValueFrom(
+          this.httpService.get<{ data: KiotVietRawInvoice[]; total: number }>(
+            `${this.baseUrl}/invoices`,
+            {
+              headers,
+              params: {
+                format: 'json',
+                pageSize,
+                currentItem,
+                status: 1,
+                fromPurchaseDate: this.toKiotVietDateTime(startOfToday),
+                toPurchaseDate: this.toKiotVietDateTime(now),
+              },
+            },
+          ),
+        );
+
+        const pageData = response.data?.data ?? [];
+        if (total == null) total = response.data?.total ?? 0;
+
+        count += pageData.filter(
+          (inv) => Number((inv as any).soldById) === Number(soldById),
+        ).length;
+
+        if (
+          pageData.length < pageSize ||
+          currentItem + pageSize >= (total || 0)
+        ) {
+          break;
+        }
+        currentItem += pageSize;
+      } while (true);
+
+      return count;
+    } catch (error) {
+      this.logger.error('countTodayInvoicesBySoldBy failed', error);
+      return 0;
+    }
+  }
+
   /**
    * Nội dung HTML (parse_mode HTML) theo mẫu tin bán hàng (💎 từng khối: NV — Đơn — KH).
    */
@@ -618,6 +694,14 @@ export class KiotVietService {
     parts.push(customerLines);
     parts.push('');
     parts.push(`<b>GHI CHÚ:</b> ${invoiceNote}`);
+
+    const soldCountToday = await this.countTodayInvoicesBySoldBy(
+      invoice.SoldById,
+    );
+    parts.push('');
+    parts.push(
+      `<b>SỐ ĐƠN ${staff} ĐÃ BÁN HÔM NAY:</b> ${soldCountToday}`,
+    );
 
     return parts.join('\n');
   }
