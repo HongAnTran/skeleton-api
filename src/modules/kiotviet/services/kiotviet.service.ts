@@ -573,46 +573,57 @@ export class KiotVietService {
     return '';
   }
 
-  /** Định dạng Date sang chuỗi mà KiotViet nhận cho fromPurchaseDate/toPurchaseDate. */
-  private toKiotVietDateTime(d: Date): string {
-    const pad = (n: number) => String(n).padStart(2, '0');
-    return (
-      `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}` +
-      `T${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`
-    );
+  /** Phần ngày (YYYY-MM-DD) theo giờ Việt Nam của một mốc thời gian. */
+  private vietnamDatePart(isoDate: string | undefined): string {
+    const d = isoDate ? new Date(isoDate) : new Date();
+    const base = Number.isNaN(d.getTime()) ? new Date() : d;
+    // en-CA cho định dạng YYYY-MM-DD
+    return base.toLocaleDateString('en-CA', { timeZone: 'Asia/Ho_Chi_Minh' });
   }
 
   /**
-   * Đếm số hóa đơn đã hoàn thành mà nhân viên (soldById) bán trong ngày hôm nay,
-   * tính tới thời điểm gọi — dùng để thống kê kèm tin nhắn Telegram.
+   * Đếm số hóa đơn đã hoàn thành mà nhân viên (SoldById) bán trong NGÀY của hóa đơn này
+   * (theo giờ Việt Nam) — dùng để thống kê kèm tin nhắn Telegram.
+   * Luôn tính cả hóa đơn hiện tại (dedupe theo Id) phòng khi API list chưa kịp index.
    */
-  private async countTodayInvoicesBySoldBy(soldById: number): Promise<number> {
-    if (!soldById || !this.retailer || !this.clientId || !this.clientSecret) {
-      this.logger.log(
-        `countTodayInvoicesBySoldBy: bỏ qua (soldById=${soldById} hoặc thiếu cấu hình)`,
-      );
+  private async countTodayInvoicesBySoldBy(
+    invoice: KiotVietWebhookInvoiceDataDto,
+  ): Promise<number> {
+    const soldById = invoice.SoldById;
+    if (!soldById) {
+      this.logger.log('countTodayInvoicesBySoldBy: bỏ qua (không có SoldById)');
       return 0;
     }
+    if (!this.retailer || !this.clientId || !this.clientSecret) {
+      this.logger.log(
+        'countTodayInvoicesBySoldBy: thiếu cấu hình KiotViet — chỉ tính hóa đơn hiện tại',
+      );
+      return 1;
+    }
+
+    // Set các Id hóa đơn hôm nay của nhân viên; thêm sẵn hóa đơn hiện tại
+    const matchedIds = new Set<number>();
+    if (invoice.Id) matchedIds.add(Number(invoice.Id));
 
     try {
+      // Ngày tính theo PurchaseDate của hóa đơn (giờ VN), dùng trọn ngày 00:00:00–23:59:59
+      const datePart = this.vietnamDatePart(invoice.PurchaseDate);
+      const fromPurchaseDate = `${datePart}T00:00:00`;
+      const toPurchaseDate = `${datePart}T23:59:59`;
       this.logger.log(
-        `countTodayInvoicesBySoldBy: bắt đầu đếm đơn cho soldById=${soldById}`,
+        `countTodayInvoicesBySoldBy: đếm cho SoldById=${soldById} ngày ${datePart} (${fromPurchaseDate} → ${toPurchaseDate})`,
       );
+
       const token = await this.getAccessToken();
       const headers = {
         Retailer: this.retailer,
         Authorization: `Bearer ${token}`,
       };
 
-      const startOfToday = new Date();
-      startOfToday.setHours(0, 0, 0, 0);
-      const now = new Date();
-
       const pageSize = 100;
       const MAX_PAGES = 10; // chặn quét vô hạn để không làm chậm/khóa webhook
       let currentItem = 0;
       let total: number | null = null;
-      let count = 0;
       let pages = 0;
 
       // API không hỗ trợ filter soldById nên lọc phía backend (giống getInvoicesByUser)
@@ -628,8 +639,8 @@ export class KiotVietService {
                 pageSize,
                 currentItem,
                 status: 1,
-                fromPurchaseDate: this.toKiotVietDateTime(startOfToday),
-                toPurchaseDate: this.toKiotVietDateTime(now),
+                fromPurchaseDate,
+                toPurchaseDate,
               },
             },
           ),
@@ -638,12 +649,15 @@ export class KiotVietService {
         const pageData = response.data?.data ?? [];
         if (total == null) total = response.data?.total ?? 0;
 
-        const pageMatch = pageData.filter(
-          (inv) => Number((inv as any).soldById) === Number(soldById),
-        ).length;
-        count += pageMatch;
+        let pageMatch = 0;
+        for (const inv of pageData) {
+          if (Number((inv as any).soldById) === Number(soldById)) {
+            pageMatch += 1;
+            if (inv.id != null) matchedIds.add(Number(inv.id));
+          }
+        }
         this.logger.log(
-          `countTodayInvoicesBySoldBy: page ${pages} currentItem=${currentItem} nhận=${pageData.length}/total=${total} khớp soldById=${pageMatch} (cộng dồn=${count})`,
+          `countTodayInvoicesBySoldBy: page ${pages} currentItem=${currentItem} nhận=${pageData.length}/total=${total} khớp soldById=${pageMatch} (tổng Id duy nhất=${matchedIds.size})`,
         );
 
         if (
@@ -662,12 +676,13 @@ export class KiotVietService {
       } while (true);
 
       this.logger.log(
-        `countTodayInvoicesBySoldBy: soldById=${soldById} → tổng ${count} đơn hôm nay`,
+        `countTodayInvoicesBySoldBy: SoldById=${soldById} → tổng ${matchedIds.size} đơn trong ngày`,
       );
-      return count;
+      return matchedIds.size;
     } catch (error) {
       this.logger.error('countTodayInvoicesBySoldBy failed', error);
-      return 0;
+      // Lỗi API: vẫn trả về số đã biết (tối thiểu là hóa đơn hiện tại)
+      return matchedIds.size || 1;
     }
   }
 
@@ -740,9 +755,7 @@ export class KiotVietService {
     parts.push('');
     parts.push(`<b>GHI CHÚ:</b> ${invoiceNote}`);
 
-    const soldCountToday = await this.countTodayInvoicesBySoldBy(
-      invoice.SoldById,
-    );
+    const soldCountToday = await this.countTodayInvoicesBySoldBy(invoice);
     parts.push('');
     parts.push(
       `<b>SỐ ĐƠN ${staff} ĐÃ BÁN HÔM NAY:</b> ${soldCountToday}`,
