@@ -1346,49 +1346,99 @@ export class KiotVietService {
     }
   }
 
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   /**
    * GET /products?includeInventory=true (phân trang 100/item) — báo cáo tồn kho iPhone
    * theo chi nhánh. Dùng lại logic phân loại iPhone (parse tên + nhóm Lock/Quốc tế).
+   *
+   * KiotViet không có filter "chỉ hàng còn tồn", nên phải tải toàn bộ sản phẩm. Để giảm
+   * thời gian chờ (cửa hàng có vài nghìn sản phẩm → vài chục trang), các trang sau trang
+   * đầu được gọi song song theo lô (giới hạn CONCURRENCY tránh bị rate limit).
    */
   private async fetchIphoneInventoryReport(
     headers: Record<string, string>,
   ): Promise<IphoneInventoryReportDto> {
     const pageSize = 100;
-    let currentItem = 0;
-    let totalFromApi: number | null = null;
+    const CONCURRENCY = 4;
+    const BATCH_DELAY_MS = 300;
+    const MAX_RETRIES = 4;
+    const RETRY_BASE_MS = 800;
     const branchMap = new Map<number, IphoneInventoryBranchAgg>();
-    let fetched = 0;
 
-    do {
-      const response = await firstValueFrom(
-        this.httpService.get<KiotVietProductListResponse>(
-          `${this.baseUrl}/products`,
-          {
-            headers,
-            params: {
-              pageSize,
-              currentItem,
-              includeInventory: true,
-              orderBy: 'name',
-              orderDirection: 'Asc',
-            },
-          },
-        ),
-      );
+    const fetchPage = async (
+      currentItem: number,
+    ): Promise<KiotVietProductListResponse> => {
+      for (let attempt = 0; ; attempt++) {
+        try {
+          const response = await firstValueFrom(
+            this.httpService.get<KiotVietProductListResponse>(
+              `${this.baseUrl}/products`,
+              {
+                headers,
+                params: {
+                  pageSize,
+                  currentItem,
+                  includeInventory: true,
+                  isActive: true,
+                  orderBy: 'id',
+                  orderDirection: 'Asc',
+                },
+              },
+            ),
+          );
+          return response.data;
+        } catch (error) {
+          const status = (error as { response?: { status?: number } })?.response
+            ?.status;
+          if (status !== 429 || attempt >= MAX_RETRIES) throw error;
 
-      const pageData = response.data?.data ?? [];
-      if (totalFromApi == null) totalFromApi = response.data?.total ?? 0;
+          // Ưu tiên Retry-After (giây) nếu KiotViet trả về, không thì exponential backoff
+          const retryAfter = Number(
+            (error as { response?: { headers?: Record<string, string> } })
+              ?.response?.headers?.['retry-after'],
+          );
+          const waitMs =
+            Number.isFinite(retryAfter) && retryAfter > 0
+              ? retryAfter * 1000
+              : RETRY_BASE_MS * 2 ** attempt;
+          this.logger.warn(
+            `KiotViet 429 khi lấy products (offset ${currentItem}); thử lại sau ${waitMs}ms (lần ${attempt + 1}/${MAX_RETRIES})`,
+          );
+          await this.sleep(waitMs);
+        }
+      }
+    };
 
-      for (const product of pageData) {
+    const accumulatePage = (page: KiotVietProductListResponse): void => {
+      for (const product of page?.data ?? []) {
         this.accumulateIphoneInventoryProduct(product, branchMap);
       }
-      fetched += pageData.length;
+    };
 
-      if (pageData.length < pageSize || fetched >= (totalFromApi || 0)) {
-        break;
+    // Trang đầu để biết tổng số bản ghi
+    const firstPage = await fetchPage(0);
+    accumulatePage(firstPage);
+    const total = firstPage?.total ?? firstPage?.data?.length ?? 0;
+
+    // Các offset còn lại, gọi song song theo lô
+    const offsets: number[] = [];
+    for (let item = pageSize; item < total; item += pageSize) {
+      offsets.push(item);
+    }
+    for (let i = 0; i < offsets.length; i += CONCURRENCY) {
+      const pages = await Promise.all(
+        offsets.slice(i, i + CONCURRENCY).map((offset) => fetchPage(offset)),
+      );
+      pages.forEach(accumulatePage);
+
+      // Nghỉ giữa các lô để tránh bị KiotViet rate limit (429); bỏ qua sau lô cuối
+      if (i + CONCURRENCY < offsets.length) {
+        await this.sleep(BATCH_DELAY_MS);
       }
-      currentItem += pageSize;
-    } while (true);
+    }
 
     return this.finalizeIphoneInventoryReport(branchMap);
   }
