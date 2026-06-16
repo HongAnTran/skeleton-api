@@ -2,6 +2,7 @@ import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { Telegraf } from 'telegraf';
+import { SocksProxyAgent } from 'socks-proxy-agent/dist';
 import { firstValueFrom } from 'rxjs';
 import { VoucherConditionType, VoucherRule } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
@@ -253,7 +254,11 @@ export class KiotVietService {
 
   private getTelegraf(botToken: string): Telegraf {
     if (this.telegramBotToken !== botToken || !this.telegramBot) {
-      this.telegramBot = new Telegraf(botToken);
+      const proxyUrl =
+        this.configService.get<string>('TELEGRAM_SOCKS_PROXY') ?? 'socks5h://127.0.0.1:40000';
+      this.telegramBot = new Telegraf(botToken, {
+        telegram: { agent: new SocksProxyAgent(proxyUrl) as unknown as import('https').Agent },
+      });
       this.telegramBotToken = botToken;
     }
     return this.telegramBot;
