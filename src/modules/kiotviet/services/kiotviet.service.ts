@@ -2,7 +2,7 @@ import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { HttpService } from '@nestjs/axios';
 import { Telegraf } from 'telegraf';
-import { SocksProxyAgent } from 'socks-proxy-agent/dist';
+import { SocksProxyAgent } from 'socks-proxy-agent';
 import { firstValueFrom } from 'rxjs';
 import { VoucherConditionType, VoucherRule } from '@prisma/client';
 import { PrismaService } from '../../../database/prisma.service';
